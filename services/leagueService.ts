@@ -56,7 +56,7 @@ const transformLeagues = (data: any[]): League[] => {
     });
 };
 
-// Simplified query to be more robust. Team objects will be hydrated in transformLeagues.
+// FIX: Added `!inner` to financials to explicitly tell Supabase how to join.
 const leagueQuery = `
     id, name, slug, logo_url, admin_email, admin_password, city, state, latitude, longitude,
     officials (*),
@@ -64,7 +64,7 @@ const leagueQuery = `
         *,
         championship_clubs ( clubs (*, players(*), technical_staff(*)) ),
         matches ( *, home_team_id, away_team_id, match_events(*) ),
-        financials:championship_financials(*),
+        financials:championship_financials!inner(*),
         clubFinancials:club_financials(*)
     )
 `;
@@ -120,8 +120,21 @@ export const createLeague = async (leagueData: { name: string, logoUrl: string, 
         throw new Error("Não foi possível obter os dados da liga após a criação.");
     }
 
-    // Return a valid League structure, transformed for the frontend
-    return transformLeagues([data])[0];
+    // FIX: Return a simple, correctly-structured League object.
+    // transformLeagues expects a complex nested structure that a simple insert does not return.
+    return {
+        id: data.id,
+        name: data.name,
+        slug: data.slug,
+        logoUrl: data.logo_url,
+        adminEmail: data.admin_email,
+        adminPassword: data.admin_password,
+        city: data.city,
+        state: data.state,
+        championships: [],
+        referees: [],
+        tableOfficials: [],
+    };
 };
 
 export const createChampionship = async (leagueId: string, champName: string): Promise<Championship> => {
