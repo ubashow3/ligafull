@@ -83,7 +83,8 @@ const App: React.FC = () => {
       setLeaguesData(data);
     } catch (error) {
       console.error("Failed to load data:", error);
-      alert("Não foi possível carregar os dados das ligas. Verifique a conexão com o banco de dados.");
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      alert(`Não foi possível carregar os dados das ligas. Verifique a conexão com o banco de dados.\n\nDetalhes: ${errorMessage}`);
     } finally {
       setIsAppLoading(false);
     }
@@ -197,10 +198,10 @@ const App: React.FC = () => {
   };
 
   // CRUD Handlers
-  const handleCreateLeague = async (name: string, logoUrl: string, email: string, password: string) => {
+  const handleCreateLeague = async (name: string, logoUrl: string, email: string, password: string, city: string, state: string) => {
     setIsCreatingLeague(true);
     try {
-      const newLeague = await leagueService.createLeague({ name, logoUrl, adminEmail: email, adminPassword: password });
+      const newLeague = await leagueService.createLeague({ name, logoUrl, adminEmail: email, adminPassword: password, city, state });
       setLeaguesData(prev => [...prev, newLeague]);
       
       setIsAdminMode(true);

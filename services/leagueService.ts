@@ -36,12 +36,12 @@ const transformLeagues = (data: any[]): League[] => {
 };
 
 const leagueQuery = `
-    id, name, slug, logo_url, admin_email, admin_password, latitude, longitude,
+    id, name, slug, logo_url, admin_email, admin_password, city, state, latitude, longitude,
     officials (*),
     championships (
         *,
         championship_clubs ( clubs (*, players(*), technical_staff(*)) ),
-        matches ( *, homeTeam:clubs!matches_home_team_id_fkey(*), awayTeam:clubs!matches_away_team_id_fkey(*), match_events(*) ),
+        matches ( *, homeTeam:clubs!home_team_id(*), awayTeam:clubs!away_team_id(*), match_events(*) ),
         financials:championship_financials(*),
         clubFinancials:club_financials(*)
     )
@@ -67,8 +67,8 @@ export const login = async (email: string, pass: string): Promise<League | null>
     return transformLeagues([data])[0];
 };
 
-export const createLeague = async (leagueData: { name: string, logoUrl: string, adminEmail: string, adminPassword: string }): Promise<League> => {
-    const { name, logoUrl, adminEmail, adminPassword } = leagueData;
+export const createLeague = async (leagueData: { name: string, logoUrl: string, adminEmail: string, adminPassword: string, city: string, state: string }): Promise<League> => {
+    const { name, logoUrl, adminEmail, adminPassword, city, state } = leagueData;
     const { data, error } = await supabase.from('leagues').insert({
         name,
         slug: generateSlug(name),
@@ -77,6 +77,8 @@ export const createLeague = async (leagueData: { name: string, logoUrl: string, 
         // SECURITY WARNING: Storing passwords in plain text is highly insecure.
         // Consider using Supabase Auth for proper user management and password hashing.
         admin_password: adminPassword,
+        city,
+        state,
     }).select().single();
 
     if (error) {

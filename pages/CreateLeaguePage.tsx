@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 interface CreateLeaguePageProps {
   onBack: () => void;
-  onCreateLeague: (name: string, logoUrl: string, email: string, password: string) => void;
+  onCreateLeague: (name: string, logoUrl: string, email: string, password: string, city: string, state: string) => void;
   isLoading: boolean;
 }
 
@@ -11,14 +11,16 @@ const CreateLeaguePage: React.FC<CreateLeaguePageProps> = ({ onBack, onCreateLea
   const [logoUrl, setLogoUrl] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
-    if (name.trim() && email.trim() && password.trim()) {
-      onCreateLeague(name.trim(), logoUrl.trim(), email.trim(), password.trim());
+    if (name.trim() && email.trim() && password.trim() && city.trim() && state.trim()) {
+      onCreateLeague(name.trim(), logoUrl.trim(), email.trim(), password.trim(), city.trim(), state.trim());
     } else {
-      alert('Nome da liga, e-mail e senha são obrigatórios.');
+      alert('Todos os campos, exceto o logo, são obrigatórios.');
     }
   };
 
@@ -51,6 +53,35 @@ const CreateLeaguePage: React.FC<CreateLeaguePageProps> = ({ onBack, onCreateLea
                   required
                   className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50" 
                 />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div>
+                  <label htmlFor="league-city" className="block text-sm font-medium text-gray-300">Cidade</label>
+                  <input 
+                    type="text" 
+                    name="league-city" 
+                    id="league-city" 
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    required
+                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50" 
+                  />
+              </div>
+              <div>
+                  <label htmlFor="league-state" className="block text-sm font-medium text-gray-300">Estado (UF)</label>
+                  <input 
+                    type="text" 
+                    name="league-state" 
+                    id="league-state" 
+                    maxLength={2}
+                    value={state}
+                    onChange={(e) => setState(e.target.value.toUpperCase())}
+                    required
+                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50" 
+                    placeholder="Ex: SP"
+                  />
+              </div>
             </div>
 
              <div>

@@ -83,6 +83,7 @@ const HomePage: React.FC<HomePageProps> = ({ leagues, onSelectLeague }) => {
             <img src={league.logoUrl} alt={`${league.name} logo`} className="w-24 h-24 sm:w-32 sm:h-32 object-cover flex-shrink-0" />
             <div className="p-4 sm:p-6">
               <h2 className="text-xl sm:text-2xl font-bold text-white group-hover:text-green-400 transition-colors duration-300">{league.name}</h2>
+              <p className="text-gray-400 text-sm">{league.city && league.state ? `${league.city}, ${league.state}` : ''}</p>
               <div className="flex items-center gap-4 mt-2 text-sm sm:text-base text-gray-400">
                 <span>{league.championships.length} campeonato(s) ativo(s)</span>
                 {league.distance !== undefined && (
