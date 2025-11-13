@@ -1,5 +1,7 @@
 {
   "name": "Liga Full",
   "description": "An application to create and manage football leagues, championships, clubs, and players. Track matches, standings, and top scorers with ease.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "geolocation"
+  ]
 }

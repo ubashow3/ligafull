@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import { mockLeagues } from './data/mockData';
-import { League, Championship, Club, Match, Player, TechnicalStaff, Official, ChampionshipFinancials, ChampionshipWizardConfig, Standing } from './types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { League, Championship, Club, Match, Player, TechnicalStaff, Official, ChampionshipFinancials, ChampionshipWizardConfig, Standing, MatchEvent } from './types';
+import * as leagueService from './services/leagueService';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Sidebar from './components/Sidebar';
@@ -16,12 +16,7 @@ import AdminChampionshipPage from './pages/admin/AdminChampionshipPage';
 import AdminMatchSummaryPage from './pages/admin/AdminMatchSummaryPage';
 import CreateMatchesPage from './pages/admin/CreateMatchesPage';
 
-// Helper function to generate a slug
-const generateSlug = (name: string) => {
-  return name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
-};
-
-// Helper function to calculate standings
+// Helper function to calculate standings (remains client-side)
 const calculateStandings = (clubs: Club[], matches: Match[]): Standing[] => {
     const standingsMap = new Map<string, Standing>();
 
@@ -34,10 +29,13 @@ const calculateStandings = (clubs: Club[], matches: Match[]): Standing[] => {
     });
 
     matches.filter(m => m.status === 'finished' && m.homeScore != null && m.awayScore != null).forEach(match => {
-        if (!standingsMap.has(match.homeTeam.id) || !standingsMap.has(match.awayTeam.id)) return;
+        const homeTeamId = typeof match.homeTeam === 'object' ? match.homeTeam.id : match.homeTeam;
+        const awayTeamId = typeof match.awayTeam === 'object' ? match.awayTeam.id : match.awayTeam;
+
+        if (!standingsMap.has(homeTeamId) || !standingsMap.has(awayTeamId)) return;
         
-        const home = standingsMap.get(match.homeTeam.id)!;
-        const away = standingsMap.get(match.awayTeam.id)!;
+        const home = standingsMap.get(homeTeamId)!;
+        const away = standingsMap.get(awayTeamId)!;
         const homeScore = match.homeScore!;
         const awayScore = match.awayScore!;
 
@@ -65,7 +63,8 @@ const calculateStandings = (clubs: Club[], matches: Match[]): Standing[] => {
 };
 
 const App: React.FC = () => {
-  const [leaguesData, setLeaguesData] = useState<League[]>(mockLeagues);
+  const [leaguesData, setLeaguesData] = useState<League[]>([]);
+  const [isAppLoading, setIsAppLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState('home');
   const [selectedLeague, setSelectedLeague] = useState<League | null>(null);
   const [selectedChampionship, setSelectedChampionship] = useState<Championship | null>(null);
@@ -77,17 +76,33 @@ const App: React.FC = () => {
   const [isAdminActionsModalOpen, setIsAdminActionsModalOpen] = useState(false);
   const [isCreatingLeague, setIsCreatingLeague] = useState(false);
 
+  const fetchData = async () => {
+    try {
+      setIsAppLoading(true);
+      const data = await leagueService.fetchLeagues();
+      setLeaguesData(data);
+    } catch (error) {
+      console.error("Failed to load data:", error);
+      alert("Não foi possível carregar os dados das ligas. Verifique a conexão com o banco de dados.");
+    } finally {
+      setIsAppLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+  
   // Synchronization effect to keep selected items in sync with the main data source
-  // This prevents stale state issues after updates
-  React.useEffect(() => {
+  useEffect(() => {
     if (selectedLeague) {
       const updatedLeague = leaguesData.find(l => l.id === selectedLeague.id);
       setSelectedLeague(updatedLeague || null);
-      if (selectedChampionship) {
-        const updatedChampionship = updatedLeague?.championships.find(c => c.id === selectedChampionship.id);
+      if (selectedChampionship && updatedLeague) {
+        const updatedChampionship = updatedLeague.championships.find(c => c.id === selectedChampionship.id);
         setSelectedChampionship(updatedChampionship || null);
-        if (selectedMatch) {
-          const updatedMatch = updatedChampionship?.matches.find(m => m.id === selectedMatch.id);
+        if (selectedMatch && updatedChampionship) {
+          const updatedMatch = updatedChampionship.matches.find(m => m.id === selectedMatch.id);
           setSelectedMatch(updatedMatch || null);
         }
       }
@@ -149,14 +164,16 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogin = (email: string, pass: string) => {
-    const league = leaguesData.find(l => l.adminEmail === email && l.adminPassword === pass);
+  const handleLogin = async (email: string, pass: string) => {
+    const league = await leagueService.login(email, pass);
     if (league) {
       setIsAdminMode(true);
       setLoggedInLeagueAdminId(league.id);
       setSelectedLeague(league);
       setCurrentPage('admin_league');
       setIsAdminModalOpen(false);
+      // Refresh all data to ensure we have the latest after logging in
+      await fetchData();
     } else {
       alert('Credenciais inválidas.');
     }
@@ -182,73 +199,43 @@ const App: React.FC = () => {
   // CRUD Handlers
   const handleCreateLeague = async (name: string, logoUrl: string, email: string, password: string) => {
     setIsCreatingLeague(true);
-    // Simulate network delay for better UX
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    const newLeague: League = {
-      id: `liga-${Date.now()}`, name, slug: generateSlug(name),
-      logoUrl: logoUrl || `https://picsum.photos/seed/${Date.now()}/200/200`,
-      adminEmail: email, adminPassword: password,
-      referees: [], tableOfficials: [], championships: [],
-    };
-
-    setLeaguesData(prev => [...prev, newLeague]);
-    
-    // Directly log in with the newly created league object to avoid race conditions
-    setIsAdminMode(true);
-    setLoggedInLeagueAdminId(newLeague.id);
-    setSelectedLeague(newLeague);
-    setCurrentPage('admin_league');
-    setIsAdminModalOpen(false);
-    
-    setIsCreatingLeague(false);
-  };
-
-  const handleCreateChampionship = (leagueId: string, champName: string) => {
-    const newChampionship: Championship = {
-      id: `champ-${leagueId}-${Date.now()}`,
-      name: champName,
-      clubs: [],
-      matches: [],
-      standings: [],
-      financials: null,
-      clubFinancials: null,
-    };
-    
-    setLeaguesData(prevLeagues => {
-      let updatedLeague: League | undefined;
-      const newLeaguesData = prevLeagues.map(l => {
-        if (l.id === leagueId) {
-          updatedLeague = {
-            ...l,
-            championships: [...l.championships, newChampionship],
-          };
-          return updatedLeague;
-        }
-        return l;
-      });
+    try {
+      const newLeague = await leagueService.createLeague({ name, logoUrl, adminEmail: email, adminPassword: password });
+      setLeaguesData(prev => [...prev, newLeague]);
       
-      // Explicitly update selectedLeague to ensure the UI re-renders with the new data.
-      if (updatedLeague && selectedLeague?.id === updatedLeague.id) {
-        setSelectedLeague(updatedLeague);
-      }
-      
-      return newLeaguesData;
-    });
+      setIsAdminMode(true);
+      setLoggedInLeagueAdminId(newLeague.id);
+      setSelectedLeague(newLeague);
+      setCurrentPage('admin_league');
+      setIsAdminModalOpen(false);
+    } catch (error) {
+        alert("Erro ao criar a liga.");
+    } finally {
+        setIsCreatingLeague(false);
+    }
+  };
+
+  const handleCreateChampionship = async (leagueId: string, champName: string) => {
+    try {
+      const newChampionship = await leagueService.createChampionship(leagueId, champName);
+      await fetchData(); // Refetch all data to ensure consistency
+    } catch (error) {
+      alert("Erro ao criar o campeonato.");
+    }
   };
     
-  const handleCreateClub = (name: string, abbreviation: string, logoUrl: string, whatsapp: string) => {
-    if (!selectedLeague || !selectedChampionship) return;
-    const newClub: Club = {
-      id: `club-${Date.now()}`, name, abbreviation,
-      logoUrl: logoUrl || `https://picsum.photos/seed/${Date.now()}/100/100`,
-      whatsapp, players: [], technicalStaff: [],
-    };
-    setLeaguesData(prev => prev.map(l => l.id === selectedLeague.id ? { ...l, championships: l.championships.map(c => c.id === selectedChampionship.id ? { ...c, clubs: [...c.clubs, newClub] } : c) } : l));
+  const handleCreateClub = async (name: string, abbreviation: string, logoUrl: string, whatsapp: string) => {
+    if (!selectedChampionship) return;
+    try {
+      await leagueService.addClubToChampionship(selectedChampionship.id, { name, abbreviation, logoUrl, whatsapp });
+      await fetchData();
+    } catch (error) {
+        alert("Erro ao adicionar clube.");
+    }
   };
     
-  // New, powerful match generation logic
-    const generateMatchesLogic = (clubs: Club[], config: ChampionshipWizardConfig): Match[] => {
+  const generateMatchesLogic = (clubs: Club[], config: ChampionshipWizardConfig): Match[] => {
+    // This logic remains the same as it's pure data transformation
     const matches: Match[] = [];
     let currentRound = 1;
 
@@ -309,7 +296,6 @@ const App: React.FC = () => {
         }
     }
 
-    // --- Phase 2: Playoffs ---
     if (config.playoffs && config.playoffTeamsPerGroup > 0) {
         const totalQualifiers = config.format === 'ROUND_ROBIN' 
             ? config.playoffTeamsPerGroup 
@@ -321,10 +307,9 @@ const App: React.FC = () => {
         }
     }
 
-    // Assign unique IDs and dates
     return matches.map((match, index) => ({
         ...match,
-        id: `m-${Date.now()}-${index}`,
+        id: `m-${Date.now()}-${index}`, // This ID is temporary for the client
         date: new Date(Date.now() + (index * 7 * 24 * 3600000)).toISOString(),
     }));
   };
@@ -380,7 +365,6 @@ const App: React.FC = () => {
           return placeholderTeam(`${i + 1}º Classificado`);
       });
 
-      // Simple ordering for playoffs: 1st vs Last, 2nd vs 2nd-to-last, etc.
       let currentStageQualifiers = [...qualifiers];
       while (currentStageQualifiers.length > 1) {
           const nextRoundQualifiers: Club[] = [];
@@ -403,220 +387,157 @@ const App: React.FC = () => {
       return matches;
   };
 
-  const handleGenerateMatches = (config: ChampionshipWizardConfig) => {
-    if (!selectedLeague || !selectedChampionship) return;
-    
-    setLeaguesData(prevLeagues => {
-      let updatedLeague: League | undefined;
-      let updatedChampionship: Championship | undefined;
-
-      const newLeaguesData = prevLeagues.map(l => {
-        if (l.id !== selectedLeague.id) return l;
-        
-        const newChampionships = l.championships.map(c => {
-          if (c.id !== selectedChampionship.id) return c;
-          const newMatches = generateMatchesLogic(c.clubs, config);
-          const newStandings = calculateStandings(c.clubs, newMatches);
-          updatedChampionship = { ...c, matches: newMatches, standings: newStandings };
-          return updatedChampionship;
-        });
-
-        updatedLeague = { ...l, championships: newChampionships };
-        return updatedLeague;
-      });
-      
-      // Atomic state update to prevent stale state.
-      if (updatedLeague) setSelectedLeague(updatedLeague);
-      if (updatedChampionship) setSelectedChampionship(updatedChampionship);
-      
-      return newLeaguesData;
-    });
-    
-    setCurrentPage('admin_championship');
+  const handleGenerateMatches = async (config: ChampionshipWizardConfig) => {
+    if (!selectedChampionship) return;
+    const newMatches = generateMatchesLogic(selectedChampionship.clubs, config);
+    try {
+        await leagueService.generateMatches(selectedChampionship.id, newMatches);
+        await fetchData();
+        setCurrentPage('admin_championship');
+    } catch (error) {
+        alert("Erro ao gerar os jogos.");
+    }
   };
 
-  const recalculateAllFinancials = (championship: Championship): Championship => {
-      if (!championship.financials) return championship;
-      const { registrationFeePerClub = 0, yellowCardFine = 0, redCardFine = 0 } = championship.financials;
-
-      const newClubFinancials = championship.clubs.map(club => {
-          let totalFines = 0;
-          championship.matches.forEach(match => {
-              match.events.forEach(event => {
-                  if (club.players.some(p => p.id === event.playerId)) {
-                      if (event.type === 'yellow_card') totalFines += yellowCardFine;
-                      if (event.type === 'red_card') totalFines += redCardFine;
-                  }
-              });
-          });
-          const existingFinancials = championship.clubFinancials?.find(cf => cf.clubId === club.id);
-          const amountPaid = existingFinancials?.amountPaid || 0;
-          const balance = (registrationFeePerClub + totalFines) - amountPaid;
-          return { clubId: club.id, registrationFeeDue: registrationFeePerClub, totalFines, amountPaid, balance };
-      });
-      return { ...championship, clubFinancials: newClubFinancials };
-  };
-
-  const handleUpdateMatch = (updatedMatch: Match) => {
-    if (!selectedLeague || !selectedChampionship) return;
-    
-    const leagueId = selectedLeague.id;
-    const championshipId = selectedChampionship.id;
-
-    setLeaguesData(prev => prev.map(l => {
-      if (l.id !== leagueId) return l;
-      return {
-        ...l,
-        championships: l.championships.map(c => {
-          if (c.id !== championshipId) return c;
-          
-          const updatedMatches = c.matches.map(m => m.id === updatedMatch.id ? updatedMatch : m);
-          
-          const updatedClubs = c.clubs.map(club => {
-            const newPlayers = club.players.map(p => ({...p, goals: 0}));
-            return {...club, players: newPlayers};
-          });
-
-          updatedMatches.forEach(match => {
-            if (match.status === 'finished') {
-              match.events.forEach(event => {
-                if (event.type === 'goal') {
-                   const clubToUpdate = updatedClubs.find(cl => cl.players.some(p => p.id === event.playerId));
-                   if (clubToUpdate) {
-                       const player = clubToUpdate.players.find(p => p.id === event.playerId);
-                       if (player) player.goals++;
-                   }
-                }
-              });
-            }
-          });
-
-          const newStandings = calculateStandings(updatedClubs, updatedMatches);
-          let updatedChampionship: Championship = { ...c, matches: updatedMatches, standings: newStandings, clubs: updatedClubs };
-          updatedChampionship = recalculateAllFinancials(updatedChampionship);
-
-          return updatedChampionship;
-        })
-      };
-    }));
+  const handleUpdateMatch = async (updatedMatch: Match) => {
+    if (!selectedChampionship) return;
+    try {
+      // The update service needs to handle recalculations or the refetch will
+      await leagueService.updateMatch(updatedMatch, selectedChampionship.clubs);
+      await fetchData();
+    } catch(error) {
+        alert("Erro ao atualizar a partida.");
+    }
   };
   
-  const handleCreateOfficial = (type: 'referees' | 'tableOfficials', data: Omit<Official, 'id'>) => {
+  const handleCreateOfficial = async (type: 'referees' | 'tableOfficials', data: Omit<Official, 'id'>) => {
     if (!loggedInLeagueAdminId) return;
-    const newOfficial: Official = { ...data, id: `${type}-${Date.now()}` };
-    setLeaguesData(prev => prev.map(l =>
-        l.id === loggedInLeagueAdminId ? { ...l, [type]: [...l[type], newOfficial] } : l
-    ));
+    try {
+        await leagueService.createOfficial(loggedInLeagueAdminId, type, data);
+        await fetchData();
+    } catch(error) {
+        alert("Erro ao criar oficial.");
+    }
   };
-  const handleUpdateOfficial = (type: 'referees' | 'tableOfficials', data: Official) => {
-    if (!loggedInLeagueAdminId) return;
-    setLeaguesData(prev => prev.map(l =>
-        l.id === loggedInLeagueAdminId ? { ...l, [type]: l[type].map(o => o.id === data.id ? data : o) } : l
-    ));
+  const handleUpdateOfficial = async (type: 'referees' | 'tableOfficials', data: Official) => {
+    try {
+        await leagueService.updateOfficial(data);
+        await fetchData();
+    } catch(error) {
+        alert("Erro ao atualizar oficial.");
+    }
   };
-  const handleDeleteOfficial = (type: 'referees' | 'tableOfficials', id: string) => {
-    if (!loggedInLeagueAdminId) return;
-    setLeaguesData(prev => prev.map(l =>
-        l.id === loggedInLeagueAdminId ? { ...l, [type]: l[type].filter(o => o.id !== id) } : l
-    ));
+  const handleDeleteOfficial = async (type: 'referees' | 'tableOfficials', id: string) => {
+     try {
+        await leagueService.deleteOfficial(id);
+        await fetchData();
+    } catch(error) {
+        alert("Erro ao deletar oficial.");
+    }
   };
 
-  const handleCreatePlayer = (clubId: string, name: string, position: string, nickname: string, cpf: string, photoUrl: string) => {
-      if (!selectedLeague || !selectedChampionship) return;
-      const newPlayer: Player = {
-          id: `player-${Date.now()}`, name, position, nickname, cpf,
-          photoUrl: photoUrl || `https://i.pravatar.cc/150?u=${Date.now()}`,
-          goals: 0
-      };
-      setLeaguesData(prev => prev.map(l => l.id === selectedLeague.id ? {
-          ...l, championships: l.championships.map(c => c.id === selectedChampionship.id ? {
-              ...c, clubs: c.clubs.map(cl => cl.id === clubId ? { ...cl, players: [...cl.players, newPlayer] } : cl)
-          } : c)
-      } : l));
+  const handleCreatePlayer = async (clubId: string, name: string, position: string, nickname: string, cpf: string, photoUrl: string) => {
+    if (!selectedChampionship) return;
+    try {
+        await leagueService.createPlayer(clubId, {name, position, nickname, cpf, photoUrl, goals: 0});
+        await fetchData();
+    } catch(error) {
+        alert("Erro ao criar jogador.");
+    }
   };
-  const handleUpdatePlayer = (clubId: string, updatedPlayer: Player) => {
-      if (!selectedLeague || !selectedChampionship) return;
-      setLeaguesData(prev => prev.map(l => l.id === selectedLeague.id ? {
-          ...l, championships: l.championships.map(c => c.id === selectedChampionship.id ? {
-              ...c, clubs: c.clubs.map(cl => cl.id === clubId ? {
-                  ...cl, players: cl.players.map(p => p.id === updatedPlayer.id ? updatedPlayer : p)
-              } : cl)
-          } : c)
-      } : l));
+  const handleUpdatePlayer = async (clubId: string, updatedPlayer: Player) => {
+     try {
+        await leagueService.updatePlayer(updatedPlayer);
+        await fetchData();
+    } catch(error) {
+        alert("Erro ao atualizar jogador.");
+    }
   };
-  const handleDeletePlayer = (clubId: string, playerId: string) => {
-      if (!selectedLeague || !selectedChampionship) return;
-      setLeaguesData(prev => prev.map(l => l.id === selectedLeague.id ? {
-          ...l, championships: l.championships.map(c => c.id === selectedChampionship.id ? {
-              ...c, clubs: c.clubs.map(cl => cl.id === clubId ? {
-                  ...cl, players: cl.players.filter(p => p.id !== playerId)
-              } : cl)
-          } : c)
-      } : l));
+  const handleDeletePlayer = async (clubId: string, playerId: string) => {
+    try {
+        await leagueService.deletePlayer(playerId);
+        await fetchData();
+    } catch(error) {
+        alert("Erro ao deletar jogador.");
+    }
   };
   
-  const handleCreateStaff = (clubId: string, name: string, role: string) => {
-      if (!selectedLeague || !selectedChampionship) return;
-      const newStaff: TechnicalStaff = { id: `staff-${Date.now()}`, name, role };
-      setLeaguesData(prev => prev.map(l => l.id === selectedLeague.id ? {
-          ...l, championships: l.championships.map(c => c.id === selectedChampionship.id ? {
-              ...c, clubs: c.clubs.map(cl => cl.id === clubId ? { ...cl, technicalStaff: [...cl.technicalStaff, newStaff] } : cl)
-          } : c)
-      } : l));
+  const handleCreateStaff = async (clubId: string, name: string, role: string) => {
+      try {
+        await leagueService.createStaff(clubId, {name, role});
+        await fetchData();
+    } catch(error) {
+        alert("Erro ao criar membro da comissão.");
+    }
   };
-  const handleUpdateStaff = (clubId: string, updatedStaff: TechnicalStaff) => {
-      if (!selectedLeague || !selectedChampionship) return;
-      setLeaguesData(prev => prev.map(l => l.id === selectedLeague.id ? {
-          ...l, championships: l.championships.map(c => c.id === selectedChampionship.id ? {
-              ...c, clubs: c.clubs.map(cl => cl.id === clubId ? {
-                  ...cl, technicalStaff: cl.technicalStaff.map(s => s.id === updatedStaff.id ? updatedStaff : s)
-              } : cl)
-          } : c)
-      } : l));
+  const handleUpdateStaff = async (clubId: string, updatedStaff: TechnicalStaff) => {
+      try {
+        await leagueService.updateStaff(updatedStaff);
+        await fetchData();
+    } catch(error) {
+        alert("Erro ao atualizar membro da comissão.");
+    }
   };
-  const handleDeleteStaff = (clubId: string, staffId: string) => {
-      if (!selectedLeague || !selectedChampionship) return;
-      setLeaguesData(prev => prev.map(l => l.id === selectedLeague.id ? {
-          ...l, championships: l.championships.map(c => c.id === selectedChampionship.id ? {
-              ...c, clubs: c.clubs.map(cl => cl.id === clubId ? {
-                  ...cl, technicalStaff: cl.technicalStaff.filter(s => s.id !== staffId)
-              } : cl)
-          } : c)
-      } : l));
+  const handleDeleteStaff = async (clubId: string, staffId: string) => {
+      try {
+        await leagueService.deleteStaff(staffId);
+        await fetchData();
+    } catch(error) {
+        alert("Erro ao deletar membro da comissão.");
+    }
   };
 
-  const handleSaveFinancials = (championshipId: string, financials: ChampionshipFinancials) => {
-      if (!selectedLeague) return;
-      setLeaguesData(prev => prev.map(l => l.id === selectedLeague.id ? {
-          ...l, championships: l.championships.map(c => {
-              if (c.id === championshipId) {
-                  return recalculateAllFinancials({ ...c, financials });
-              }
-              return c;
-          })
-      } : l));
+  const handleSaveFinancials = async (championshipId: string, financials: ChampionshipFinancials) => {
+       if (!selectedChampionship) return;
+       try {
+            // Client-side calculation remains, but now we persist it.
+            const { registrationFeePerClub, yellowCardFine, redCardFine } = financials;
+            const costPerGame = financials.refereeFee + (financials.assistantFee * 2) + financials.tableOfficialFee + financials.fieldFee;
+            const totalCost = costPerGame * selectedChampionship.matches.length;
+            const finalRegFee = selectedChampionship.clubs.length > 0 ? totalCost / selectedChampionship.clubs.length : 0;
+            
+            const finalFinancials: ChampionshipFinancials = { ...financials, totalCost, registrationFeePerClub: finalRegFee };
+
+            await leagueService.saveFinancials(championshipId, finalFinancials, selectedChampionship.clubs);
+            await fetchData();
+       } catch (error) {
+            alert("Erro ao salvar dados financeiros.");
+       }
   };
 
-  const handleUpdateClubPayment = (clubId: string, amount: number) => {
-      if (!selectedLeague || !selectedChampionship) return;
-      setLeaguesData(prev => prev.map(l => l.id === selectedLeague.id ? {
-          ...l, championships: l.championships.map(c => c.id === selectedChampionship.id ? {
-              ...c, clubFinancials: (c.clubFinancials || []).map(cf => cf.clubId === clubId ? {
-                  ...cf, amountPaid: amount, balance: (cf.registrationFeeDue + cf.totalFines) - amount
-              } : cf)
-          } : c)
-      } : l));
+  const handleUpdateClubPayment = async (clubId: string, amount: number) => {
+       if (!selectedChampionship) return;
+       try {
+            await leagueService.updateClubPayment(selectedChampionship.id, clubId, amount);
+            await fetchData();
+       } catch (error) {
+            alert("Erro ao atualizar pagamento.");
+       }
   };
 
   // Render Logic
   const renderPage = () => {
+    if (isAppLoading) {
+        return (
+            <div className="flex justify-center items-center h-64">
+                <svg className="animate-spin -ml-1 mr-3 h-10 w-10 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="text-xl">Carregando Ligas...</span>
+            </div>
+        );
+    }
+    
     switch (currentPage) {
       case 'home':
         return <HomePage leagues={leaguesData} onSelectLeague={handleSelectLeague} />;
       case 'league':
         return selectedLeague && <LeaguePage league={selectedLeague} onSelectChampionship={handleSelectChampionship} onBack={handleBack} isAdminMode={false} onCreateChampionship={handleCreateChampionship} />;
       case 'championship':
-        return selectedLeague && selectedChampionship && <ChampionshipPage league={selectedLeague} championship={selectedChampionship} onBack={handleBack} onSelectMatch={handleSelectMatch} isAdminMode={false} onCreateClub={handleCreateClub} onGenerateMatches={handleGenerateMatches} />;
+        // Pass the calculated standings to the component
+        const champWithStandings = selectedChampionship ? { ...selectedChampionship, standings: calculateStandings(selectedChampionship.clubs, selectedChampionship.matches)} : null;
+        return selectedLeague && champWithStandings && <ChampionshipPage league={selectedLeague} championship={champWithStandings} onBack={handleBack} onSelectMatch={handleSelectMatch} isAdminMode={false} onCreateClub={handleCreateClub} onGenerateMatches={handleGenerateMatches} />;
       case 'match':
         return selectedLeague && selectedMatch && <MatchSummaryPage league={selectedLeague} match={selectedMatch} onBack={handleBack} />;
       case 'create_league':
@@ -625,7 +546,8 @@ const App: React.FC = () => {
       case 'admin_league':
         return selectedLeague && <AdminLeaguePage league={selectedLeague} onSelectChampionship={handleSelectChampionship} onCreateChampionship={handleCreateChampionship} onCreateOfficial={handleCreateOfficial} onUpdateOfficial={handleUpdateOfficial} onDeleteOfficial={handleDeleteOfficial} onSaveFinancials={handleSaveFinancials} />;
       case 'admin_championship':
-        return selectedLeague && selectedChampionship && <AdminChampionshipPage league={selectedLeague} championship={selectedChampionship} onBack={handleBack} onSelectMatch={handleSelectMatch} onCreateClub={handleCreateClub} onGenerateMatches={handleGenerateMatches} onUpdateMatch={handleUpdateMatch} onUpdateClubPayment={handleUpdateClubPayment} onUpdatePlayer={handleUpdatePlayer} onCreatePlayer={handleCreatePlayer} onDeletePlayer={handleDeletePlayer} onCreateStaff={handleCreateStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onNavigateToCreateMatches={handleNavigateToCreateMatches} />;
+        const adminChampWithStandings = selectedChampionship ? { ...selectedChampionship, standings: calculateStandings(selectedChampionship.clubs, selectedChampionship.matches)} : null;
+        return selectedLeague && adminChampWithStandings && <AdminChampionshipPage league={selectedLeague} championship={adminChampWithStandings} onBack={handleBack} onSelectMatch={handleSelectMatch} onCreateClub={handleCreateClub} onGenerateMatches={handleGenerateMatches} onUpdateMatch={handleUpdateMatch} onUpdateClubPayment={handleUpdateClubPayment} onUpdatePlayer={handleUpdatePlayer} onCreatePlayer={handleCreatePlayer} onDeletePlayer={handleDeletePlayer} onCreateStaff={handleCreateStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onNavigateToCreateMatches={handleNavigateToCreateMatches} />;
       case 'admin_match':
         return selectedLeague && selectedChampionship && selectedMatch && <AdminMatchSummaryPage league={selectedLeague} championship={selectedChampionship} match={selectedMatch} onBack={handleBack} onUpdateMatch={handleUpdateMatch} />;
       case 'admin_create_matches':

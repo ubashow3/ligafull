@@ -55,6 +55,8 @@ export interface Match {
     assistant1?: string;
     assistant2?: string;
     tableOfficial?: string;
+    // FIX: Add optional championship_id to be available on matches fetched from the DB.
+    championship_id?: string;
 }
 
 export interface Standing {
@@ -111,6 +113,9 @@ export interface League {
   referees: Official[];
   tableOfficials: Official[];
   championships: Championship[];
+  latitude?: number;
+  longitude?: number;
+  distance?: number; // Optional property to hold calculated distance
 }
 
 export interface ChampionshipWizardConfig {
