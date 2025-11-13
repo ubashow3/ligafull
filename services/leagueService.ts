@@ -58,7 +58,10 @@ export const login = async (email: string, pass: string): Promise<League | null>
     const { data, error } = await supabase.from('leagues')
         .select(leagueQuery)
         .eq('admin_email', email)
-        .eq('admin_password', pass) // WARNING: Insecure
+        // SECURITY WARNING: Comparing passwords in plain text is highly insecure.
+        // This method is vulnerable to various attacks.
+        // It's strongly recommended to migrate to Supabase Auth for secure password handling.
+        .eq('admin_password', pass)
         .single();
     if (error || !data) return null;
     return transformLeagues([data])[0];
@@ -71,11 +74,30 @@ export const createLeague = async (leagueData: { name: string, logoUrl: string, 
         slug: generateSlug(name),
         logo_url: logoUrl || `https://picsum.photos/seed/${Date.now()}/200/200`,
         admin_email: adminEmail,
-        admin_password: adminPassword, // WARNING: Insecure
+        // SECURITY WARNING: Storing passwords in plain text is highly insecure.
+        // Consider using Supabase Auth for proper user management and password hashing.
+        admin_password: adminPassword,
     }).select().single();
 
-    if (error) throw error;
-    return { ...data, championships: [], referees: [], tableOfficials: [] }; // Return a valid League structure
+    if (error) {
+        if (error.code === '23505') { // Unique constraint violation
+            if (error.message.includes('leagues_name_key')) {
+                throw new Error('Já existe uma liga com este nome.');
+            }
+            // Note: You might need to adjust this key name based on your actual table definition
+            if (error.message.includes('leagues_admin_email_key') || error.message.includes('leagues_admin_email_idx')) {
+                throw new Error('Este e-mail já está sendo utilizado por outra liga.');
+            }
+        }
+        throw error;
+    }
+    
+    if (!data) {
+        throw new Error("Não foi possível obter os dados da liga após a criação.");
+    }
+
+    // Return a valid League structure, transformed for the frontend
+    return transformLeagues([data])[0];
 };
 
 export const createChampionship = async (leagueId: string, champName: string): Promise<Championship> => {

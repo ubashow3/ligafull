@@ -209,7 +209,9 @@ const App: React.FC = () => {
       setCurrentPage('admin_league');
       setIsAdminModalOpen(false);
     } catch (error) {
-        alert("Erro ao criar a liga.");
+        // Display a more specific error message from the service layer.
+        const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
+        alert(`Erro ao criar a liga: ${errorMessage}`);
     } finally {
         setIsCreatingLeague(false);
     }
