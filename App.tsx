@@ -81,10 +81,13 @@ const App: React.FC = () => {
       setIsAppLoading(true);
       const data = await leagueService.fetchLeagues();
       setLeaguesData(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to load data:", error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      alert(`Não foi possível carregar os dados das ligas. Verifique a conexão com o banco de dados.\n\nDetalhes: ${errorMessage}`);
+      // Enhanced error message extraction from Supabase error object
+      const details = error.details ? `\nDetalhes: ${error.details}` : '';
+      const hint = error.hint ? `\nDica: ${error.hint}` : '';
+      const errorMessage = `${error.message}${details}${hint}`;
+      alert(`Não foi possível carregar os dados das ligas. Verifique a conexão com o banco de dados.\n\n${errorMessage}`);
     } finally {
       setIsAppLoading(false);
     }

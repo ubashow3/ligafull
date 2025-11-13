@@ -6,7 +6,6 @@ const generateSlug = (name: string) => {
   return name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
 };
 
-
 // Helper to transform Supabase data into the nested structure the app expects
 const transformLeagues = (data: any[]): League[] => {
     return data.map(league => {
@@ -16,10 +15,32 @@ const transformLeagues = (data: any[]): League[] => {
                 players: cc.clubs?.players || [],
                 technicalStaff: cc.clubs?.technical_staff || [],
             }));
-            const matches = (champ.matches || []).map((match: any) => ({
-                ...match,
-                events: match.match_events || [],
-            }));
+
+            // Create a map for quick club lookups
+            const clubMap = new Map<string, Club>(clubs.map((c: Club) => [c.id, c]));
+            
+            // Hydrate matches with full club objects
+            const matches = (champ.matches || []).map((match: any) => {
+                const homeTeam = clubMap.get(match.home_team_id);
+                const awayTeam = clubMap.get(match.away_team_id);
+                
+                // If a team is not found (e.g., placeholder in playoffs), create a basic object
+                const getTeamObject = (teamId: string, teamData?: Club) => {
+                    if (teamData) return teamData;
+                    // For placeholder teams like 'Vencedor Jogo 1'
+                    if (teamId.startsWith('ph-')) {
+                        return { id: teamId, name: teamId.substring(3).replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), abbreviation: 'TBD', logoUrl: '', players: [], technicalStaff: [] };
+                    }
+                    return { id: teamId, name: 'Desconhecido', abbreviation: '???', logoUrl: '', players: [], technicalStaff: [] };
+                };
+
+                return {
+                    ...match,
+                    homeTeam: getTeamObject(match.home_team_id, homeTeam),
+                    awayTeam: getTeamObject(match.away_team_id, awayTeam),
+                    events: match.match_events || [],
+                };
+            });
             return { ...champ, clubs, matches };
         });
         
@@ -35,13 +56,14 @@ const transformLeagues = (data: any[]): League[] => {
     });
 };
 
+// Simplified query to be more robust. Team objects will be hydrated in transformLeagues.
 const leagueQuery = `
     id, name, slug, logo_url, admin_email, admin_password, city, state, latitude, longitude,
     officials (*),
     championships (
         *,
         championship_clubs ( clubs (*, players(*), technical_staff(*)) ),
-        matches ( *, homeTeam:clubs!home_team_id(*), awayTeam:clubs!away_team_id(*), match_events(*) ),
+        matches ( *, home_team_id, away_team_id, match_events(*) ),
         financials:championship_financials(*),
         clubFinancials:club_financials(*)
     )
