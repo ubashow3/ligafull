@@ -1,4 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+
+// Interfaces for IBGE API data
+interface Estado {
+  id: number;
+  sigla: string;
+  nome: string;
+}
+
+interface Cidade {
+  id: number;
+  nome: string;
+}
+
 
 interface CreateLeaguePageProps {
   onBack: () => void;
@@ -11,14 +24,72 @@ const CreateLeaguePage: React.FC<CreateLeaguePageProps> = ({ onBack, onCreateLea
   const [logoUrl, setLogoUrl] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [city, setCity] = useState('');
-  const [state, setState] = useState('');
+  
+  // State for location dropdowns
+  const [estados, setEstados] = useState<Estado[]>([]);
+  const [cidades, setCidades] = useState<Cidade[]>([]);
+  const [selectedEstado, setSelectedEstado] = useState(''); // Stores state abbreviation (e.g., 'SP')
+  const [selectedCidade, setSelectedCidade] = useState('');
+  
+  const [loadingEstados, setLoadingEstados] = useState(true);
+  const [loadingCidades, setLoadingCidades] = useState(false);
+
+
+  // Fetch states on component mount
+  useEffect(() => {
+    const fetchEstados = async () => {
+      try {
+        setLoadingEstados(true);
+        const response = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome');
+        if (!response.ok) throw new Error('Failed to fetch states');
+        const data: Estado[] = await response.json();
+        setEstados(data);
+      } catch (error) {
+        console.error("Error fetching states:", error);
+        alert("Não foi possível carregar a lista de estados. Tente novamente.");
+      } finally {
+        setLoadingEstados(false);
+      }
+    };
+    fetchEstados();
+  }, []);
+
+  // Fetch cities when a state is selected
+  useEffect(() => {
+    if (!selectedEstado) {
+      setCidades([]);
+      setSelectedCidade('');
+      return;
+    }
+
+    const fetchCidades = async () => {
+      try {
+        setLoadingCidades(true);
+        const response = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${selectedEstado}/municipios`);
+        if (!response.ok) throw new Error('Failed to fetch cities');
+        const data: Cidade[] = await response.json();
+        setCidades(data);
+      } catch (error) {
+        console.error("Error fetching cities:", error);
+        alert("Não foi possível carregar a lista de cidades. Tente novamente.");
+      } finally {
+        setLoadingCidades(false);
+      }
+    };
+    
+    fetchCidades();
+  }, [selectedEstado]);
+
+  const handleEstadoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedEstado(e.target.value);
+    setSelectedCidade(''); // Reset city selection
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
-    if (name.trim() && email.trim() && password.trim() && city.trim() && state.trim()) {
-      onCreateLeague(name.trim(), logoUrl.trim(), email.trim(), password.trim(), city.trim(), state.trim());
+    if (name.trim() && email.trim() && password.trim() && selectedCidade && selectedEstado) {
+      onCreateLeague(name.trim(), logoUrl.trim(), email.trim(), password.trim(), selectedCidade, selectedEstado);
     } else {
       alert('Todos os campos, exceto o logo, são obrigatórios.');
     }
@@ -57,30 +128,38 @@ const CreateLeaguePage: React.FC<CreateLeaguePageProps> = ({ onBack, onCreateLea
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
-                  <label htmlFor="league-city" className="block text-sm font-medium text-gray-300">Cidade</label>
-                  <input 
-                    type="text" 
-                    name="league-city" 
-                    id="league-city" 
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
+                  <label htmlFor="league-state" className="block text-sm font-medium text-gray-300">Estado</label>
+                  <select 
+                    id="league-state" 
+                    name="league-state"
+                    value={selectedEstado}
+                    onChange={handleEstadoChange}
                     required
-                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50" 
-                  />
+                    disabled={loadingEstados || isLoading}
+                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50"
+                  >
+                    <option value="" disabled>{loadingEstados ? 'Carregando...' : 'Selecione um estado'}</option>
+                    {estados.map(estado => (
+                      <option key={estado.id} value={estado.sigla}>{estado.nome}</option>
+                    ))}
+                  </select>
               </div>
               <div>
-                  <label htmlFor="league-state" className="block text-sm font-medium text-gray-300">Estado (UF)</label>
-                  <input 
-                    type="text" 
-                    name="league-state" 
-                    id="league-state" 
-                    maxLength={2}
-                    value={state}
-                    onChange={(e) => setState(e.target.value.toUpperCase())}
+                  <label htmlFor="league-city" className="block text-sm font-medium text-gray-300">Cidade</label>
+                  <select 
+                    id="league-city" 
+                    name="league-city"
+                    value={selectedCidade}
+                    onChange={(e) => setSelectedCidade(e.target.value)}
                     required
-                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50" 
-                    placeholder="Ex: SP"
-                  />
+                    disabled={!selectedEstado || loadingCidades || isLoading}
+                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50"
+                  >
+                     <option value="" disabled>{loadingCidades ? 'Carregando cidades...' : (selectedEstado ? 'Selecione uma cidade' : 'Escolha um estado primeiro')}</option>
+                    {cidades.map(cidade => (
+                      <option key={cidade.id} value={cidade.nome}>{cidade.nome}</option>
+                    ))}
+                  </select>
               </div>
             </div>
 
