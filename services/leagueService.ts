@@ -54,9 +54,9 @@ const transformLeagues = (data: any[]): League[] => {
             let referees: Official[] = [];
             let tableOfficials: Official[] = [];
             const officialsMap = new Map<string, string>();
-            try {
-                const rawOfficials = Array.isArray(leagueData.officials) ? leagueData.officials : [];
-                for (const o of rawOfficials) {
+            const rawOfficials = Array.isArray(leagueData.officials) ? leagueData.officials : [];
+            for (const o of rawOfficials) {
+                try {
                     if (!o || typeof o !== 'object' || !o.id) continue;
                     const official: Official = {
                         id: String(o.id || ''), name: String(o.name || 'Nome Inválido'),
@@ -66,30 +66,29 @@ const transformLeagues = (data: any[]): League[] => {
                     officialsMap.set(official.id, official.name);
                     if (o.type === 'referee') referees.push(official);
                     if (o.type === 'table_official') tableOfficials.push(official);
+                } catch (e) {
+                    console.error("Error processing an official record, skipping:", o, e);
                 }
-            } catch (e) {
-                console.error("Error processing officials for league, continuing with empty officials:", leagueData.id, e);
-                referees = []; tableOfficials = [];
             }
             
             // CHAMPIONSHIPS
             let championships: Championship[] = [];
-            try {
-                const rawChampionships = Array.isArray(leagueData.championships) ? leagueData.championships : [];
-                for (const champData of rawChampionships) {
+            const rawChampionships = Array.isArray(leagueData.championships) ? leagueData.championships : [];
+            for (const champData of rawChampionships) {
+                try {
                     if (!champData || typeof champData !== 'object' || !champData.id) continue;
 
                     // CLUBS
                     let clubs: Club[] = [];
-                    try {
-                        const rawClubs = Array.isArray(champData.clubs) ? champData.clubs : [];
-                        for (const clubData of rawClubs) {
-                             if (!clubData || typeof clubData !== 'object' || !clubData.id) continue;
+                    const rawClubs = Array.isArray(champData.clubs) ? champData.clubs : [];
+                    for (const clubData of rawClubs) {
+                         try {
+                            if (!clubData || typeof clubData !== 'object' || !clubData.id) continue;
                             
                             let players: Player[] = [];
-                            try {
-                                const rawPlayers = Array.isArray(clubData.players) ? clubData.players : [];
-                                for(const p of rawPlayers) {
+                            const rawPlayers = Array.isArray(clubData.players) ? clubData.players : [];
+                            for(const p of rawPlayers) {
+                                try {
                                     if (!p || typeof p !== 'object' || !p.id) continue;
                                     players.push({
                                         id: String(p.id), name: String(p.name || 'Nome Inválido'),
@@ -97,19 +96,19 @@ const transformLeagues = (data: any[]): League[] => {
                                         photoUrl: String(p.photo_url || ''), birthDate: String(p.birth_date || ''),
                                         nickname: String(p.nickname || ''), cpf: String(p.cpf || ''),
                                     });
-                                }
-                            } catch (e) { console.error("Error processing players for club, continuing with empty players:", clubData.id, e); players = []; }
+                                } catch (e) { console.error("Error processing a player record, skipping:", p, e); }
+                            }
 
                             let technicalStaff: TechnicalStaff[] = [];
-                            try {
-                                const rawStaff = Array.isArray(clubData.technical_staff) ? clubData.technical_staff : [];
-                                for(const ts of rawStaff) {
+                            const rawStaff = Array.isArray(clubData.technical_staff) ? clubData.technical_staff : [];
+                            for(const ts of rawStaff) {
+                                try {
                                     if (!ts || typeof ts !== 'object' || !ts.id) continue;
                                     technicalStaff.push({
                                         id: String(ts.id), name: String(ts.name || 'Nome Inválido'), role: String(ts.role || 'Cargo Inválido'),
                                     });
-                                }
-                            } catch(e) { console.error("Error processing staff for club, continuing with empty staff:", clubData.id, e); technicalStaff = []; }
+                                } catch(e) { console.error("Error processing a staff record, skipping:", ts, e); }
+                            }
 
                             clubs.push({
                                 id: String(clubData.id), name: String(clubData.name || 'Nome Inválido'),
@@ -117,8 +116,8 @@ const transformLeagues = (data: any[]): League[] => {
                                 whatsapp: String(clubData.whatsapp || ''),
                                 players, technicalStaff,
                             });
-                        }
-                    } catch (e) { console.error("Error processing clubs for championship, continuing with empty clubs:", champData.id, e); clubs = []; }
+                        } catch (e) { console.error("Error processing a club record, skipping:", clubData, e); }
+                    }
                     
                     const clubMap = new Map<string, Club>(clubs.map(c => [c.id, c]));
                     const getTeamObject = (teamId: string | null | undefined): Club => {
@@ -132,19 +131,19 @@ const transformLeagues = (data: any[]): League[] => {
 
                     // MATCHES
                     let matches: Match[] = [];
-                    try {
-                        const rawMatches = Array.isArray(champData.matches) ? champData.matches : [];
-                        for(const matchData of rawMatches) {
+                    const rawMatches = Array.isArray(champData.matches) ? champData.matches : [];
+                    for(const matchData of rawMatches) {
+                        try {
                             if (!matchData || typeof matchData !== 'object' || !matchData.id) continue;
                             
                             let events: MatchEvent[] = [];
-                            try {
-                                const rawEvents = Array.isArray(matchData.match_events) ? matchData.match_events : [];
-                                for(const e of rawEvents) {
+                            const rawEvents = Array.isArray(matchData.match_events) ? matchData.match_events : [];
+                            for(const e of rawEvents) {
+                                try {
                                     if (!e || typeof e !== 'object' || !e.type || !e.player_id) continue;
                                     events.push({ type: e.type, playerId: String(e.player_id), minute: Number(e.minute) || 0, playerName: '' });
-                                }
-                            } catch(e) { console.error("Error processing events for match, continuing with empty events:", matchData.id, e); events = []; }
+                                } catch(er) { console.error("Error processing a match event record, skipping:", e, er); }
+                            }
                             
                             matches.push({
                                 id: String(matchData.id), round: Number(matchData.round) || 1,
@@ -164,8 +163,8 @@ const transformLeagues = (data: any[]): League[] => {
                                 homeLineup: Array.isArray(matchData.home_lineup) ? matchData.home_lineup : [], 
                                 awayLineup: Array.isArray(matchData.away_lineup) ? matchData.away_lineup : [],
                             });
-                        }
-                    } catch(e) { console.error("Error processing matches for championship, continuing with empty matches:", champData.id, e); matches = []; }
+                        } catch(e) { console.error("Error processing a match record, skipping:", matchData, e); }
+                    }
 
                     // FINANCIALS
                     let financials: ChampionshipFinancials | undefined = undefined;
@@ -185,8 +184,8 @@ const transformLeagues = (data: any[]): League[] => {
                         id: String(champData.id), name: String(champData.name || 'Nome Inválido'),
                         clubs, matches, standings: [], financials
                     });
-                }
-            } catch(e) { console.error("Error processing championships for league, continuing with empty championships:", leagueData.id, e); championships = []; }
+                } catch(e) { console.error("Error processing a championship record, skipping:", champData, e); }
+            }
             
             leagues.push({
                 id: String(leagueData.id), name: String(leagueData.name), slug: String(leagueData.slug || generateSlug(leagueData.name)),
