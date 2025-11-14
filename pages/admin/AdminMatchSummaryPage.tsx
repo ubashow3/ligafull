@@ -17,6 +17,28 @@ const AdminMatchSummaryPage: React.FC<AdminMatchSummaryPageProps> = ({ match, le
     setEditableMatch(match);
   }, [match]);
 
+  const handleShirtNumberChange = (playerId: string, team: 'home' | 'away', shirtNumberStr: string) => {
+    const lineupKey = team === 'home' ? 'homeLineup' : 'awayLineup';
+    const currentLineup = editableMatch[lineupKey] || [];
+    const otherPlayers = currentLineup.filter(p => p.playerId !== playerId);
+
+    const parsedNumber = parseInt(shirtNumberStr, 10);
+    
+    let updatedLineup;
+    if (shirtNumberStr.trim() === '' || isNaN(parsedNumber)) {
+        // Remove from lineup if empty or not a number
+        updatedLineup = otherPlayers;
+    } else {
+        // Add/update in lineup
+        updatedLineup = [...otherPlayers, { playerId, shirtNumber: parsedNumber }];
+    }
+    
+    setEditableMatch(prev => ({
+        ...prev,
+        [lineupKey]: updatedLineup,
+    }));
+  };
+
   const homeTeam = championship.clubs.find(c => c.id === match.homeTeam.id) || match.homeTeam;
   const awayTeam = championship.clubs.find(c => c.id === match.awayTeam.id) || match.awayTeam;
 
@@ -79,6 +101,13 @@ const AdminMatchSummaryPage: React.FC<AdminMatchSummaryPageProps> = ({ match, le
     return stats;
   };
 
+  const getPlayerShirtNumber = (playerId: string, team: 'home' | 'away'): number | string => {
+    const lineupKey = team === 'home' ? 'homeLineup' : 'awayLineup';
+    const lineup = editableMatch[lineupKey] || [];
+    const playerEntry = lineup.find(p => p.playerId === playerId);
+    return playerEntry ? playerEntry.shirtNumber : '';
+  };
+
   const formatMatchDate = (dateString: string): string => {
     const date = new Date(dateString);
     const day = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
@@ -87,23 +116,34 @@ const AdminMatchSummaryPage: React.FC<AdminMatchSummaryPageProps> = ({ match, le
     return `${day} • ${dayOfWeek.split('-')[0]} • ${time}`;
   };
 
-  const renderEditablePlayerList = (players: Player[]) => (
+  const renderEditablePlayerList = (players: Player[], teamType: 'home' | 'away') => (
     <div className="w-full animate-fade-in">
         <ul className="divide-y divide-gray-700 bg-gray-900/50 rounded-md">
-            <li className="p-3 grid grid-cols-4 gap-2 text-xs font-bold text-gray-400">
-                <span className="col-span-1">Jogador</span>
+            <li className="p-3 grid grid-cols-6 gap-2 text-xs font-bold text-gray-400">
+                <span className="col-span-2">Jogador</span>
+                <span className="text-center">Nº</span>
                 <span className="text-center">Gols</span>
                 <span className="text-center">CA</span>
                 <span className="text-center">CV</span>
             </li>
             {players.map(player => {
               const stats = getPlayerStats(player.id);
+              const shirtNumber = getPlayerShirtNumber(player.id, teamType);
               return (
-                <li key={player.id} className="p-3 grid grid-cols-4 gap-2 items-center">
-                    <div className="col-span-1">
+                <li key={player.id} className="p-3 grid grid-cols-6 gap-2 items-center">
+                    <div className="col-span-2">
                        <p className="text-sm sm:text-base font-medium text-white truncate">{player.nickname || player.name}</p>
                        <p className="text-xs text-gray-400">{player.position}</p> 
                     </div>
+                    <input 
+                        type="number" 
+                        min="0"
+                        value={shirtNumber}
+                        onChange={(e) => handleShirtNumberChange(player.id, teamType, e.target.value)}
+                        className="bg-gray-700 text-white text-center rounded w-12 sm:w-16 mx-auto p-1 disabled:opacity-50"
+                        disabled={editableMatch.status === 'finished'}
+                        placeholder="-"
+                    />
                     <input 
                         type="number" 
                         min="0"
@@ -130,7 +170,7 @@ const AdminMatchSummaryPage: React.FC<AdminMatchSummaryPageProps> = ({ match, le
                     />
                 </li>
             )})}
-             {players.length === 0 && <li className="py-4 text-center text-gray-500 col-span-4">Nenhum jogador cadastrado neste time.</li>}
+             {players.length === 0 && <li className="py-4 text-center text-gray-500 col-span-6">Nenhum jogador cadastrado neste time.</li>}
         </ul>
     </div>
   );
@@ -196,8 +236,8 @@ const AdminMatchSummaryPage: React.FC<AdminMatchSummaryPageProps> = ({ match, le
             </div>
             
             <div className="mt-4">
-              {activeTab === 'home' && renderEditablePlayerList(homeTeam.players)}
-              {activeTab === 'away' && renderEditablePlayerList(awayTeam.players)}
+              {activeTab === 'home' && renderEditablePlayerList(homeTeam.players, 'home')}
+              {activeTab === 'away' && renderEditablePlayerList(awayTeam.players, 'away')}
             </div>
           </div>
 

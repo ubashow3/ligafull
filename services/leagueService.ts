@@ -55,7 +55,7 @@ const transformLeagues = (data: any[]): League[] => {
                     id: p.id,
                     name: p.name,
                     position: p.position,
-                    goals: p.goals_in_championship,
+                    goals: Number(p.goals_in_championship) || 0,
                     photoUrl: p.photo_url,
                     birthDate: p.birth_date,
                     nickname: p.nickname,
@@ -93,6 +93,8 @@ const transformLeagues = (data: any[]): League[] => {
                     assistant2: officialsMap.get(match.assistant2_id),
                     tableOfficial: officialsMap.get(match.table_official_id),
                     championship_id: match.championship_id,
+                    homeLineup: match.home_lineup || [],
+                    awayLineup: match.away_lineup || [],
                 };
             });
 
@@ -171,6 +173,8 @@ const leagueQuery = `
             assistant2_id,
             table_official_id,
             championship_id,
+            home_lineup,
+            away_lineup,
             match_events (
                 type,
                 player_id,
@@ -182,14 +186,16 @@ const leagueQuery = `
 
 // Helper to correctly structure the data from the many-to-many join
 const structureChampionships = (data: any[]) => {
+    if (!data) return [];
     return data.map(league => ({
         ...league,
-        championships: league.championships.map((champ: any) => ({
+        championships: (league.championships || []).map((champ: any) => ({
             ...champ,
-            clubs: champ.championship_clubs.map((cc: any) => cc.clubs)
+            // More robustly filter out invalid club data from the join.
+            clubs: (champ.championship_clubs || []).map((cc: any) => cc.clubs).filter(club => club && club.id)
         }))
-    }))
-}
+    }));
+};
 
 export const fetchLeagues = async (): Promise<League[]> => {
     const { data, error } = await supabase.from('leagues').select(leagueQuery);
@@ -315,6 +321,8 @@ export const updateMatch = async (match: Match, league: League) => {
         table_official_id: match.tableOfficial ? officialsMap.get(match.tableOfficial) : null,
         home_team_id: match.homeTeam.id,
         away_team_id: match.awayTeam.id,
+        home_lineup: match.homeLineup,
+        away_lineup: match.awayLineup,
     }).eq('id', match.id);
     if (matchError) throw matchError;
 
@@ -348,10 +356,10 @@ export const updateMatch = async (match: Match, league: League) => {
     const clubIds = (championshipClubs || []).map(cc => cc.club_id);
     if (clubIds.length === 0) return;
 
-    // FIX: Fetch club_id along with id to use in the robust upsert later.
+    // FIX: Fetch all player data to ensure all non-nullable fields are present in the upsert payload.
     const { data: playersInChampionship, error: playersError } = await supabase
         .from('players')
-        .select('id, club_id')
+        .select('*')
         .in('club_id', clubIds);
     if (playersError) throw playersError;
 
@@ -371,14 +379,14 @@ export const updateMatch = async (match: Match, league: League) => {
         }
     });
     
-    // FIX: Create a payload for upsert that includes the required 'club_id' to prevent not-null constraint violations.
+    // FIX: Map over players, preserving all original data and only updating the goal count.
+    // This prevents `upsert` from nullifying other columns that have NOT NULL constraints.
     const playersToUpdate = (playersInChampionship || []).map(player => ({
-        id: player.id,
-        club_id: player.club_id,
+        ...player,
         goals_in_championship: allPlayerGoals[player.id] || 0,
     }));
     
-    // FIX: Use a single, robust bulk 'upsert' instead of a loop of 'updates'. This is more performant and solves the error.
+    // Use a single, robust bulk 'upsert'.
     if (playersToUpdate.length > 0) {
         const { error: upsertError } = await supabase
             .from('players')

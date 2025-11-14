@@ -1,4 +1,5 @@
 
+
 export interface Player {
   id: string;
   name: string;
@@ -42,7 +43,7 @@ export interface MatchEvent {
 }
 
 export interface Match {
-    id: string;
+    id:string;
     round: number;
     homeTeam: Club;
     awayTeam: Club;
@@ -57,6 +58,8 @@ export interface Match {
     assistant2?: string;
     tableOfficial?: string;
     championship_id?: string;
+    homeLineup?: { playerId: string; shirtNumber: number | string }[];
+    awayLineup?: { playerId: string; shirtNumber: number | string }[];
 }
 
 export interface Standing {

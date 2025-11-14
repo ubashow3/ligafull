@@ -108,7 +108,13 @@ const App: React.FC = () => {
       setLeagues(data);
     } catch (error) {
       console.error("Failed to fetch data:", error);
-      alert('Falha ao carregar dados. Verifique o console para mais detalhes.');
+      // Provides a more descriptive error message by checking error type.
+      const message = error instanceof Error 
+        ? error.message 
+        : (typeof error === 'object' && error && 'message' in error) 
+        ? String((error as {message: string}).message)
+        : JSON.stringify(error);
+      alert(`Falha ao carregar dados: ${message}`);
     } finally {
       setIsLoading(false);
     }
