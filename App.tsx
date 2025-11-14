@@ -1,6 +1,7 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
-import { League, Championship, Club, Match, Player, TechnicalStaff, Official, ChampionshipWizardConfig, Standing, MatchEvent } from './types';
+import { League, Championship, Club, Match, Player, TechnicalStaff, Official, ChampionshipWizardConfig, Standing } from './types';
 import * as leagueService from './services/leagueService';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -18,7 +19,6 @@ import AdminMatchSummaryPage from './pages/admin/AdminMatchSummaryPage';
 import CreateMatchesPage from './pages/admin/CreateMatchesPage';
 
 // Helper function to calculate standings (remains client-side)
-// FIX: Completed the function logic to calculate standings and return a sorted array, resolving the "must return a value" error.
 const calculateStandings = (clubs: Club[], matches: Match[]): Standing[] => {
     const standingsMap = new Map<string, Standing>();
 
@@ -80,7 +80,6 @@ const calculateStandings = (clubs: Club[], matches: Match[]): Standing[] => {
     return standings;
 };
 
-// FIX: Added the main App component and its default export, which was missing and causing a build error.
 type View =
   | { name: 'home' }
   | { name: 'league'; leagueId: string }
@@ -109,7 +108,7 @@ const App: React.FC = () => {
       setLeagues(data);
     } catch (error) {
       console.error("Failed to fetch data:", error);
-      alert('Falha ao carregar dados.');
+      alert('Falha ao carregar dados. Verifique o console para mais detalhes.');
     } finally {
       setIsLoading(false);
     }
@@ -144,15 +143,26 @@ const App: React.FC = () => {
     return currentChampionship?.matches.find(m => m.id === view.matchId) || null;
   }, [currentChampionship, view]);
 
+  // --- HANDLERS ---
+
   const handleLogin = async (email: string, pass: string) => {
-    const loggedInLeague = processedLeagues.find(l => l.adminEmail === email && l.adminPassword === pass);
-    if (loggedInLeague) {
-      setIsAdminMode(true);
-      setAdminLeague(loggedInLeague);
-      setView({ name: 'admin_league', leagueId: loggedInLeague.id });
-      setIsAdminModalOpen(false);
-    } else {
-      alert('Credenciais inválidas.');
+    try {
+      const loggedInLeague = await leagueService.login(email, pass);
+      if (loggedInLeague) {
+        setIsAdminMode(true);
+        setAdminLeague(loggedInLeague);
+        setView({ name: 'admin_league', leagueId: loggedInLeague.id });
+        setIsAdminModalOpen(false);
+        // We need to refetch to ensure we have the adminPassword hash if needed later
+        // or just add it to the returned object from login service
+        const fullLeagueData = leagues.find(l => l.id === loggedInLeague.id) || loggedInLeague;
+        setAdminLeague(fullLeagueData);
+      } else {
+        alert('Credenciais inválidas.');
+      }
+    } catch (error) {
+       console.error("Login failed:", error);
+       alert('Ocorreu um erro durante o login.');
     }
   };
 
@@ -175,43 +185,192 @@ const App: React.FC = () => {
       setIsLoading(false);
     }
   };
-
-  const onUpdateMatch = async (updatedMatch: Match) => {
-    if (!currentLeague) return;
+  
+  const handleCreateChampionship = async (leagueId: string, champName: string) => {
     try {
-      await leagueService.updateMatch(updatedMatch, currentLeague);
-      await fetchData();
-    } catch (error) {
-      console.error("Failed to update match", error);
+        await leagueService.createChampionship(leagueId, champName);
+        await fetchData();
+    } catch (error: any) {
+        alert(`Erro ao criar campeonato: ${error.message}`);
     }
   };
 
-  const dummyAction = (action: string) => async () => {
-    console.log(action);
-    alert('Ação de admin não implementada neste escopo. Recarregando dados...');
-    await fetchData();
+  const handleCreateClub = async (name: string, abbreviation: string, logoUrl: string, whatsapp: string) => {
+    if (view.name !== 'admin_championship' && view.name !== 'create_matches') return;
+    try {
+        await leagueService.addClubToChampionship(view.championshipId, { name, abbreviation, logoUrl, whatsapp });
+        await fetchData();
+    } catch (error: any) {
+        alert(`Erro ao adicionar clube: ${error.message}`);
+    }
   };
 
+  const onUpdateMatch = async (updatedMatch: Match) => {
+    if (!adminLeague) return;
+    try {
+      await leagueService.updateMatch(updatedMatch, adminLeague);
+      await fetchData();
+    } catch (error) {
+      console.error("Failed to update match", error);
+       alert(`Erro ao atualizar partida: ${(error as Error).message}`);
+    }
+  };
+  
+  const handleCreateOfficial = async (type: 'referees' | 'tableOfficials', data: Omit<Official, 'id'>) => {
+    if (!adminLeague) return;
+    try {
+      await leagueService.createOfficial(adminLeague.id, type, data);
+      await fetchData();
+    } catch (error) {
+      alert(`Erro ao criar oficial: ${(error as Error).message}`);
+    }
+  };
+  
+  const handleUpdateOfficial = async (type: 'referees' | 'tableOfficials', data: Official) => {
+    try {
+      await leagueService.updateOfficial(data);
+      await fetchData();
+    } catch (error) {
+      alert(`Erro ao atualizar oficial: ${(error as Error).message}`);
+    }
+  };
+  
+  const handleDeleteOfficial = async (type: 'referees' | 'tableOfficials', id: string) => {
+     try {
+      await leagueService.deleteOfficial(id);
+      await fetchData();
+    } catch (error) {
+      alert(`Erro ao deletar oficial: ${(error as Error).message}`);
+    }
+  };
+  
+  const handleCreatePlayer = async (clubId: string, name: string, position: string, nickname: string, cpf: string, photoUrl: string) => {
+    try {
+      await leagueService.createPlayer(clubId, { name, position, nickname, cpf, photoUrl, goals: 0 });
+      await fetchData();
+    } catch (error) {
+      alert(`Erro ao criar jogador: ${(error as Error).message}`);
+    }
+  };
+
+  const handleUpdatePlayer = async (clubId: string, updatedPlayer: Player) => {
+     try {
+      await leagueService.updatePlayer(updatedPlayer);
+      await fetchData();
+    } catch (error) {
+      alert(`Erro ao atualizar jogador: ${(error as Error).message}`);
+    }
+  };
+
+  const handleDeletePlayer = async (clubId: string, playerId: string) => {
+    try {
+      await leagueService.deletePlayer(playerId);
+      await fetchData();
+    } catch (error) {
+      alert(`Erro ao deletar jogador: ${(error as Error).message}`);
+    }
+  };
+
+  const handleCreateStaff = async (clubId: string, name: string, role: string) => {
+     try {
+      await leagueService.createStaff(clubId, { name, role });
+      await fetchData();
+    } catch (error) {
+      alert(`Erro ao criar staff: ${(error as Error).message}`);
+    }
+  };
+
+  const handleUpdateStaff = async (clubId: string, updatedStaff: TechnicalStaff) => {
+     try {
+      await leagueService.updateStaff(updatedStaff);
+      await fetchData();
+    } catch (error) {
+      alert(`Erro ao atualizar staff: ${(error as Error).message}`);
+    }
+  };
+
+  const handleDeleteStaff = async (clubId: string, staffId: string) => {
+     try {
+      await leagueService.deleteStaff(staffId);
+      await fetchData();
+    } catch (error) {
+      alert(`Erro ao deletar staff: ${(error as Error).message}`);
+    }
+  };
+  
+  const handleGenerateMatches = async (config: ChampionshipWizardConfig) => {
+    // Note: The actual logic for generating match pairings based on config (e.g., round-robin algorithm)
+    // is complex and should be implemented here or in a helper function.
+    // For now, this is a placeholder.
+    alert('Funcionalidade de geração de partidas ainda não implementada.');
+    console.log('Generating matches with config:', config);
+    // 1. Call a function: const generatedMatches = generatePairings(championship.clubs, config);
+    // 2. await leagueService.generateMatches(championshipId, generatedMatches);
+    // 3. await fetchData();
+  };
+
+
+  // --- RENDER ---
   const renderContent = () => {
-    if (isLoading) return <div className="text-center">Carregando...</div>;
+    if (isLoading) return <div className="text-center py-20">Carregando...</div>;
     
     if (isAdminMode && adminLeague) {
-        const adminLeagueData = processedLeagues.find(l => l.id === adminLeague.id) || adminLeague;
-        const adminChampionship = adminLeagueData.championships.find(c => view.name === 'admin_championship' && c.id === view.championshipId);
-        const adminMatch = adminChampionship?.matches.find(m => view.name === 'admin_match' && m.id === view.matchId);
-
+        const adminLeagueData = processedLeagues.find(l => l.id === adminLeague.id);
+        if (!adminLeagueData) {
+            handleLogout();
+            return <p>Erro ao carregar dados do administrador.</p>;
+        }
+        
         switch (view.name) {
             case 'admin_league':
-                return <AdminLeaguePage league={adminLeagueData} onSelectChampionship={champ => setView({name: 'admin_championship', leagueId: adminLeagueData.id, championshipId: champ.id})} onCreateChampionship={dummyAction('Create Champ')} onCreateOfficial={dummyAction('Create Official')} onUpdateOfficial={dummyAction('Update Official')} onDeleteOfficial={dummyAction('Delete Official')} />;
+                return <AdminLeaguePage 
+                            league={adminLeagueData} 
+                            onSelectChampionship={champ => setView({name: 'admin_championship', leagueId: adminLeagueData.id, championshipId: champ.id})} 
+                            onCreateChampionship={handleCreateChampionship}
+                            onCreateOfficial={handleCreateOfficial}
+                            onUpdateOfficial={handleUpdateOfficial}
+                            onDeleteOfficial={handleDeleteOfficial}
+                       />;
+
             case 'admin_championship':
-                if (adminChampionship) return <AdminChampionshipPage championship={adminChampionship} league={adminLeagueData} onBack={() => setView({name: 'admin_league', leagueId: adminLeagueData.id})} onSelectMatch={match => setView({name: 'admin_match', leagueId: adminLeagueData.id, championshipId: adminChampionship.id, matchId: match.id})} onCreateClub={dummyAction('Create Club')} onGenerateMatches={dummyAction('Generate Matches')} onUpdateMatch={onUpdateMatch} onNavigateToCreateMatches={() => setView({name: 'create_matches', leagueId: adminLeagueData.id, championshipId: adminChampionship.id})} onCreatePlayer={dummyAction('Create Player')} onUpdatePlayer={dummyAction('Update Player')} onDeletePlayer={dummyAction('Delete Player')} onCreateStaff={dummyAction('Create Staff')} onUpdateStaff={dummyAction('Update Staff')} onDeleteStaff={dummyAction('Delete Staff')} />;
+                const adminChampionship = adminLeagueData.championships.find(c => c.id === view.championshipId);
+                if (adminChampionship) return <AdminChampionshipPage 
+                                                championship={adminChampionship} 
+                                                league={adminLeagueData} 
+                                                onBack={() => setView({name: 'admin_league', leagueId: adminLeagueData.id})} 
+                                                onSelectMatch={match => setView({name: 'admin_match', leagueId: adminLeagueData.id, championshipId: adminChampionship.id, matchId: match.id})} 
+                                                onCreateClub={handleCreateClub} 
+                                                onGenerateMatches={handleGenerateMatches}
+                                                onUpdateMatch={onUpdateMatch} 
+                                                onNavigateToCreateMatches={() => setView({name: 'create_matches', leagueId: adminLeagueData.id, championshipId: adminChampionship.id})} 
+                                                onCreatePlayer={handleCreatePlayer}
+                                                onUpdatePlayer={handleUpdatePlayer}
+                                                onDeletePlayer={handleDeletePlayer}
+                                                onCreateStaff={handleCreateStaff}
+                                                onUpdateStaff={handleUpdateStaff}
+                                                onDeleteStaff={handleDeleteStaff}
+                                               />;
                 break;
+
             case 'admin_match':
-                if (adminMatch && adminChampionship) return <AdminMatchSummaryPage match={adminMatch} league={adminLeagueData} championship={adminChampionship} onBack={() => setView({name: 'admin_championship', leagueId: adminLeagueData.id, championshipId: adminChampionship.id})} onUpdateMatch={onUpdateMatch} />;
+                const champForMatch = adminLeagueData.championships.find(c => view.name === 'admin_match' && c.id === view.championshipId);
+                const adminMatch = champForMatch?.matches.find(m => m.id === view.matchId);
+                if (adminMatch && champForMatch) return <AdminMatchSummaryPage 
+                                                            match={adminMatch} 
+                                                            league={adminLeagueData} 
+                                                            championship={champForMatch}
+                                                            onBack={() => setView({name: 'admin_championship', leagueId: adminLeagueData.id, championshipId: champForMatch.id})} 
+                                                            onUpdateMatch={onUpdateMatch} 
+                                                        />;
                 break;
+                
             case 'create_matches':
                  const champForCreation = adminLeagueData.championships.find(c => c.id === view.championshipId);
-                 if (champForCreation) return <CreateMatchesPage championship={champForCreation} onBack={() => setView({name: 'admin_championship', leagueId: adminLeagueData.id, championshipId: champForCreation.id})} onGenerateMatches={dummyAction('Generate Matches')} />
+                 if (champForCreation) return <CreateMatchesPage 
+                                                 championship={champForCreation} 
+                                                 onBack={() => setView({name: 'admin_championship', leagueId: adminLeagueData.id, championshipId: champForCreation.id})} 
+                                                 onGenerateMatches={handleGenerateMatches}
+                                              />
                 break;
         }
     }
@@ -226,20 +385,23 @@ const App: React.FC = () => {
             if (currentChampionship && currentLeague) return <ChampionshipPage championship={currentChampionship} league={currentLeague} onBack={() => setView({ name: 'league', leagueId: currentLeague.id })} onSelectMatch={match => setView({ name: 'match', leagueId: currentLeague.id, championshipId: currentChampionship.id, matchId: match.id })} isAdminMode={false} onCreateClub={() => {}} onGenerateMatches={() => {}} />;
             break;
         case 'match':
-            if (currentMatch && currentLeague) return <MatchSummaryPage match={currentMatch} league={currentLeague} onBack={() => setView({ name: 'championship', leagueId: currentLeague.id, championshipId: currentMatch.championship_id! })} />;
+            if (currentMatch && currentLeague && currentChampionship) return <MatchSummaryPage match={currentMatch} league={currentLeague} onBack={() => setView({ name: 'championship', leagueId: currentLeague.id, championshipId: currentChampionship.id })} />;
             break;
         case 'create_league':
             return <CreateLeaguePage onBack={() => setView({ name: 'home' })} onCreateLeague={handleCreateLeague} isLoading={isLoading} />;
     }
-    return <div><p>Página não encontrada ou dados indisponíveis.</p><button onClick={() => setView({name: 'home'})}>Voltar para Home</button></div>;
+    return <div><p>Página não encontrada ou dados indisponíveis.</p><button onClick={() => setView({name: 'home'})} className="text-green-400 hover:underline">Voltar para Home</button></div>;
   };
 
   return (
     <div className="bg-gray-900 text-gray-200 min-h-screen font-sans">
       <Header
         onTitleClick={() => {
-          if (isAdminMode) handleLogout();
-          setView({ name: 'home' });
+          if (isAdminMode) {
+              handleLogout(); // Always log out if in admin mode
+          } else {
+             setView({ name: 'home' });
+          }
         }}
         onAdminClick={() => {
           if (isAdminMode) setIsAdminActionsModalOpen(true);
@@ -252,7 +414,10 @@ const App: React.FC = () => {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         leagues={processedLeagues}
-        onSelectLeague={league => setView({ name: 'league', leagueId: league.id })}
+        onSelectLeague={league => {
+          setView({ name: 'league', leagueId: league.id });
+          setIsSidebarOpen(false);
+        }}
       />
       <main className="container mx-auto px-4 py-8">
         {renderContent()}
