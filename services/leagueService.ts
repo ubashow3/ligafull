@@ -1,4 +1,5 @@
 
+
 import { supabase } from '../supabaseClient';
 import { League, Championship, Club, Match, Player, TechnicalStaff, Official, MatchEvent } from '../types';
 
@@ -157,6 +158,7 @@ export const login = async (email: string, pass: string): Promise<League | null>
 export const createLeague = async (leagueData: { name: string, logoUrl: string, adminEmail: string, adminPassword: string, state: string, city: string }): Promise<League> => {
     const { name, logoUrl, adminEmail, adminPassword, state, city } = leagueData;
     const { data, error } = await supabase.from('leagues').insert({
+        id: crypto.randomUUID(),
         name,
         slug: generateSlug(name),
         logo_url: logoUrl || `https://picsum.photos/seed/${Date.now()}/200/200`,
@@ -199,6 +201,7 @@ export const createLeague = async (leagueData: { name: string, logoUrl: string, 
 
 export const createChampionship = async (leagueId: string, champName: string): Promise<Championship> => {
     const { data, error } = await supabase.from('championships').insert({
+        id: crypto.randomUUID(),
         name: champName,
         league_id: leagueId
     }).select().single();
@@ -209,6 +212,7 @@ export const createChampionship = async (leagueId: string, champName: string): P
 export const addClubToChampionship = async (championshipId: string, clubData: { name: string, abbreviation: string, logoUrl: string, whatsapp: string }) => {
     // 1. Create the club
     const { data: newClub, error: clubError } = await supabase.from('clubs').insert({
+        id: crypto.randomUUID(),
         name: clubData.name,
         abbreviation: clubData.abbreviation,
         logo_url: clubData.logoUrl || `https://picsum.photos/seed/${Date.now()}/100/100`,
@@ -226,6 +230,7 @@ export const addClubToChampionship = async (championshipId: string, clubData: { 
 
 export const generateMatches = async (championshipId: string, matches: Match[]) => {
     const matchesToInsert = matches.map(m => ({
+        id: m.id || crypto.randomUUID(),
         championship_id: championshipId,
         round: m.round,
         home_team_id: (m.homeTeam as Club).id,
@@ -306,7 +311,7 @@ export const updateMatch = async (match: Match, league: League) => {
 
 // Official Handlers
 export const createOfficial = async (leagueId: string, type: 'referees' | 'tableOfficials', official: Omit<Official, 'id'>) => {
-    await supabase.from('officials').insert({ ...official, league_id: leagueId, type: type === 'referees' ? 'referee' : 'table_official', bank_account: official.bankAccount });
+    await supabase.from('officials').insert({ id: crypto.randomUUID(), ...official, league_id: leagueId, type: type === 'referees' ? 'referee' : 'table_official', bank_account: official.bankAccount });
 };
 export const updateOfficial = async (official: Official) => {
     await supabase.from('officials').update({ name: official.name, nickname: official.nickname, cpf: official.cpf, bank_account: official.bankAccount }).eq('id', official.id);
@@ -317,7 +322,7 @@ export const deleteOfficial = async (id: string) => {
 
 // Player Handlers
 export const createPlayer = async (clubId: string, player: Omit<Player, 'id'>) => {
-    await supabase.from('players').insert({ ...player, club_id: clubId, photo_url: player.photoUrl, birth_date: player.birthDate, goals_in_championship: 0 });
+    await supabase.from('players').insert({ id: crypto.randomUUID(), ...player, club_id: clubId, photo_url: player.photoUrl, birth_date: player.birthDate, goals_in_championship: 0 });
 };
 export const updatePlayer = async (player: Player) => {
     await supabase.from('players').update({ name: player.name, nickname: player.nickname, position: player.position, cpf: player.cpf, photo_url: player.photoUrl }).eq('id', player.id);
@@ -328,7 +333,7 @@ export const deletePlayer = async (id: string) => {
 
 // Staff Handlers
 export const createStaff = async (clubId: string, staff: Omit<TechnicalStaff, 'id'>) => {
-    await supabase.from('technical_staff').insert({ ...staff, club_id: clubId });
+    await supabase.from('technical_staff').insert({ id: crypto.randomUUID(), ...staff, club_id: clubId });
 };
 export const updateStaff = async (staff: TechnicalStaff) => {
     await supabase.from('technical_staff').update({ name: staff.name, role: staff.role }).eq('id', staff.id);
