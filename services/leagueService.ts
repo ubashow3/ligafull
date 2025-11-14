@@ -80,8 +80,6 @@ const leagueQuery = `
     admin_password_hash,
     city,
     state,
-    latitude,
-    longitude,
     officials (
         id,
         name,

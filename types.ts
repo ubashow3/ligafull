@@ -107,9 +107,6 @@ export interface League {
   championships: Championship[];
   city?: string;
   state?: string;
-  latitude?: number;
-  longitude?: number;
-  distance?: number; // Optional property to hold calculated distance
 }
 
 export interface ChampionshipWizardConfig {
