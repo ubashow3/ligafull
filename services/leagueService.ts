@@ -18,13 +18,20 @@ const transformLeagues = (data: any[]): League[] => {
 
         const championships = (league.championships || []).map((champ: any) => {
             const clubs = (champ.clubs || []).map((club: any) => ({
-                ...club,
+                id: club.id,
+                name: club.name,
+                abbreviation: club.abbreviation,
                 logoUrl: club.logo_url,
+                whatsapp: club.whatsapp,
                 players: (club.players || []).map((p: any) => ({
-                    ...p,
+                    id: p.id,
+                    name: p.name,
+                    position: p.position,
                     goals: p.goals_in_championship,
                     photoUrl: p.photo_url,
                     birthDate: p.birth_date,
+                    nickname: p.nickname,
+                    cpf: p.cpf,
                 })),
                 technicalStaff: (club.technical_staff || []).map((ts: any) => ({...ts})),
             }));
@@ -43,15 +50,21 @@ const transformLeagues = (data: any[]): League[] => {
                 };
 
                 return {
-                    ...match,
+                    id: match.id,
+                    round: match.round,
                     homeTeam: getTeamObject(match.home_team_id, homeTeam),
                     awayTeam: getTeamObject(match.away_team_id, awayTeam),
+                    homeScore: match.home_score,
+                    awayScore: match.away_score,
                     date: match.match_date,
-                    events: (match.match_events || []).map((e: any) => ({ ...e, playerId: e.player_id })),
+                    status: match.status,
+                    location: match.location,
+                    events: (match.match_events || []).map((e: any) => ({ type: e.type, playerId: e.player_id, minute: e.minute, playerName: '' })),
                     referee: officialsMap.get(match.referee_id),
                     assistant1: officialsMap.get(match.assistant1_id),
                     assistant2: officialsMap.get(match.assistant2_id),
                     tableOfficial: officialsMap.get(match.table_official_id),
+                    championship_id: match.championship_id,
                 };
             });
 
@@ -91,26 +104,28 @@ const leagueQuery = `
     championships (
         id,
         name,
-        clubs (
-            id,
-            name,
-            abbreviation,
-            logo_url,
-            whatsapp,
-            players (
+        championship_clubs (
+            clubs (
                 id,
                 name,
-                position,
-                goals_in_championship,
-                photo_url,
-                birth_date,
-                nickname,
-                cpf
-            ),
-            technical_staff (
-                id,
-                name,
-                role
+                abbreviation,
+                logo_url,
+                whatsapp,
+                players (
+                    id,
+                    name,
+                    position,
+                    goals_in_championship,
+                    photo_url,
+                    birth_date,
+                    nickname,
+                    cpf
+                ),
+                technical_staff (
+                    id,
+                    name,
+                    role
+                )
             )
         ),
         matches (
@@ -137,11 +152,22 @@ const leagueQuery = `
     )
 `;
 
+// Helper to correctly structure the data from the many-to-many join
+const structureChampionships = (data: any[]) => {
+    return data.map(league => ({
+        ...league,
+        championships: league.championships.map((champ: any) => ({
+            ...champ,
+            clubs: champ.championship_clubs.map((cc: any) => cc.clubs)
+        }))
+    }))
+}
 
 export const fetchLeagues = async (): Promise<League[]> => {
     const { data, error } = await supabase.from('leagues').select(leagueQuery);
     if (error) throw error;
-    return transformLeagues(data);
+    const structuredData = structureChampionships(data);
+    return transformLeagues(structuredData);
 };
 
 export const login = async (email: string, pass: string): Promise<League | null> => {
@@ -151,7 +177,8 @@ export const login = async (email: string, pass: string): Promise<League | null>
         .eq('admin_password_hash', pass)
         .single();
     if (error || !data) return null;
-    return transformLeagues([data])[0];
+    const structuredData = structureChampionships([data]);
+    return transformLeagues(structuredData)[0];
 };
 
 export const createLeague = async (leagueData: { name: string, logoUrl: string, adminEmail: string, adminPassword: string, state: string, city: string }): Promise<League> => {
@@ -333,7 +360,7 @@ export const createOfficial = async (leagueId: string, type: 'referees' | 'table
         cpf,
         bank_account: bankAccount,
         type: type === 'referees' ? 'referee' : 'table_official',
-    });
+    }).select();
     if (error) {
         console.error("Supabase createOfficial error:", error);
         throw new Error(`Falha ao criar oficial: ${error.message}`);
@@ -358,7 +385,7 @@ export const deleteOfficial = async (id: string) => {
 // Player Handlers
 export const createPlayer = async (clubId: string, player: Omit<Player, 'id'>) => {
     const { name, position, nickname, cpf, photoUrl, birthDate, goals } = player;
-    const { error } = await supabase.from('players').insert({
+    const { data, error } = await supabase.from('players').insert({
         id: crypto.randomUUID(),
         club_id: clubId,
         name,
@@ -367,12 +394,13 @@ export const createPlayer = async (clubId: string, player: Omit<Player, 'id'>) =
         cpf,
         photo_url: photoUrl,
         birth_date: birthDate,
-        goals_in_championship: goals,
-    });
+        goals_in_championship: goals, // FIX: Corrected column name from 'goals' to 'goals_in_championship'
+    }).select();
     if (error) {
         console.error("Supabase createPlayer error:", error);
         throw new Error(`Falha ao criar jogador: ${error.message}`);
     }
+    return data;
 };
 export const updatePlayer = async (player: Player) => {
     const { id, name, nickname, position, cpf, photoUrl, birthDate } = player;
@@ -400,16 +428,17 @@ export const deletePlayer = async (id: string) => {
 // Staff Handlers
 export const createStaff = async (clubId: string, staff: Omit<TechnicalStaff, 'id'>) => {
     const { name, role } = staff;
-    const { error } = await supabase.from('technical_staff').insert({
+    const { data, error } = await supabase.from('technical_staff').insert({
         id: crypto.randomUUID(),
         club_id: clubId,
         name,
         role,
-    });
+    }).select();
     if (error) {
         console.error("Supabase createStaff error:", error);
         throw new Error(`Falha ao criar membro da comissão: ${error.message}`);
     }
+    return data;
 };
 export const updateStaff = async (staff: TechnicalStaff) => {
     const { id, name, role } = staff;
@@ -449,7 +478,7 @@ export const createOrGetPlaceholderClub = async (clubName: string): Promise<Club
     }
 
     const newPlaceholderClub = {
-        id: `ph-${clubName.toLowerCase().replace(/\s/g, '-')}`, // Use a deterministic ID for placeholders
+        id: `ph-${clubName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
         name: clubName,
         abbreviation: 'TBD',
         logo_url: ''

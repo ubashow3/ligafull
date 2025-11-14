@@ -23,9 +23,11 @@ const EditGameDetailsModal: React.FC<EditGameDetailsModalProps> = ({ isOpen, onC
     awayTeamId: match.awayTeam.id,
   });
 
-  const isPlayoffMatch = useMemo(() => match.homeTeam.abbreviation === 'TBD' || match.awayTeam.abbreviation === 'TBD', [match]);
+  const isPlayoffMatch = useMemo(() => {
+    return match.homeTeam.abbreviation === 'TBD' || match.awayTeam.abbreviation === 'TBD';
+  }, [match]);
   
-  const realClubs = useMemo(() => championshipClubs.filter(c => !c.id.startsWith('ph-')), [championshipClubs]);
+  const realClubs = useMemo(() => championshipClubs.filter(c => c.abbreviation !== 'TBD' && c.id !== 'bye'), [championshipClubs]);
 
   if (!isOpen) return null;
 
