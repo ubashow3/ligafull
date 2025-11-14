@@ -318,11 +318,12 @@ export const updateMatch = async (match: Match, league: League) => {
     if (clubsError) throw clubsError;
     
     const clubIds = (championshipClubs || []).map(cc => cc.club_id);
-    if (clubIds.length === 0) return; // No clubs in championship, nothing to update
+    if (clubIds.length === 0) return;
 
+    // FIX: Fetch club_id along with id to use in the robust upsert later.
     const { data: playersInChampionship, error: playersError } = await supabase
         .from('players')
-        .select('id')
+        .select('id, club_id')
         .in('club_id', clubIds);
     if (playersError) throw playersError;
 
@@ -342,10 +343,23 @@ export const updateMatch = async (match: Match, league: League) => {
         }
     });
     
-    const playersToUpdate = Object.entries(allPlayerGoals).map(([id, goals_in_championship]) => ({ id, goals_in_championship }));
+    // FIX: Create a payload for upsert that includes the required 'club_id' to prevent not-null constraint violations.
+    const playersToUpdate = (playersInChampionship || []).map(player => ({
+        id: player.id,
+        club_id: player.club_id,
+        goals_in_championship: allPlayerGoals[player.id] || 0,
+    }));
+    
+    // FIX: Use a single, robust bulk 'upsert' instead of a loop of 'updates'. This is more performant and solves the error.
     if (playersToUpdate.length > 0) {
-        const { error: playerUpdateError } = await supabase.from('players').upsert(playersToUpdate, { onConflict: 'id' });
-        if (playerUpdateError) throw playerUpdateError;
+        const { error: upsertError } = await supabase
+            .from('players')
+            .upsert(playersToUpdate, { onConflict: 'id' });
+
+        if (upsertError) {
+            console.error(`Failed to upsert player goals`, upsertError);
+            throw upsertError;
+        }
     }
 };
 
@@ -394,7 +408,7 @@ export const createPlayer = async (clubId: string, player: Omit<Player, 'id'>) =
         cpf,
         photo_url: photoUrl,
         birth_date: birthDate,
-        goals_in_championship: goals, // FIX: Corrected column name from 'goals' to 'goals_in_championship'
+        goals_in_championship: goals,
     }).select();
     if (error) {
         console.error("Supabase createPlayer error:", error);

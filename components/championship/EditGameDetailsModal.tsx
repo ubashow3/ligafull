@@ -24,6 +24,7 @@ const EditGameDetailsModal: React.FC<EditGameDetailsModalProps> = ({ isOpen, onC
   });
 
   const isPlayoffMatch = useMemo(() => {
+    // A more robust way to check for a placeholder team
     return match.homeTeam.abbreviation === 'TBD' || match.awayTeam.abbreviation === 'TBD';
   }, [match]);
   
