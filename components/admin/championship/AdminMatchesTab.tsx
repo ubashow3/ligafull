@@ -72,6 +72,7 @@ const AdminMatchesTab: React.FC<AdminMatchesTabProps> = ({ matches, onSelectMatc
             match={matchToEdit}
             league={league}
             onSave={handleSaveChanges}
+            championshipClubs={clubs}
         />
       )}
       <h2 className="text-2xl sm:text-3xl font-bold text-white mb-6">JOGOS</h2>
