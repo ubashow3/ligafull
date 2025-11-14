@@ -107,14 +107,32 @@ const App: React.FC = () => {
       const data = await leagueService.fetchLeagues();
       setLeagues(data);
     } catch (error) {
-      console.error("Failed to fetch data:", error);
-      // Provides a more descriptive error message by checking error type.
-      const message = error instanceof Error 
-        ? error.message 
-        : (typeof error === 'object' && error && 'message' in error) 
-        ? String((error as {message: string}).message)
-        : JSON.stringify(error);
-      alert(`Falha ao carregar dados: ${message}`);
+        console.error("Failed to fetch data:", error);
+
+        let message = 'Ocorreu um erro desconhecido.';
+        if (error instanceof Error) {
+            message = error.message;
+        } else if (typeof error === 'object' && error !== null) {
+            if ('message' in error && typeof (error as any).message === 'string') {
+                message = (error as any).message;
+                if ('details' in error && typeof (error as any).details === 'string') {
+                    message += `\nDetalhes: ${(error as any).details}`;
+                }
+                if ('hint' in error && typeof (error as any).hint === 'string') {
+                    message += `\nDica: ${(error as any).hint}`;
+                }
+            } else {
+                try {
+                    message = JSON.stringify(error, null, 2);
+                } catch {
+                    message = 'Não foi possível converter o objeto de erro para texto.';
+                }
+            }
+        } else {
+            message = String(error);
+        }
+
+        alert(`Falha ao carregar dados:\n${message}`);
     } finally {
       setIsLoading(false);
     }

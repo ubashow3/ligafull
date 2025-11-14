@@ -42,33 +42,54 @@ const MatchSummaryPage: React.FC<MatchSummaryPageProps> = ({ match, league, onBa
     return `${day} • ${dayOfWeek.split('-')[0]} • ${time}`;
   };
 
-  const renderPlayerList = (players: Player[]) => (
-    <div className="w-full animate-fade-in">
-        <ul className="divide-y divide-gray-700 bg-gray-900/50 rounded-md">
-            {players.map(player => (
-                <li key={player.id} className="p-3 flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                       <img src={player.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt={player.name} className="w-10 h-10 rounded-full object-cover"/>
-                       <div>
-                         <p className="text-sm sm:text-base font-medium text-white">{player.nickname || player.name}</p>
-                         <p className="text-xs text-gray-400">{player.position}</p> 
-                       </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        {match.events.filter(e => e.playerId === player.id).map((event, index) => (
-                            <span key={`${event.playerId}-${index}`} className="flex items-center space-x-1 text-xs text-gray-300">
-                                {event.type === 'goal' && <SoccerBallIcon />}
-                                {event.type === 'yellow_card' && <YellowCardIcon />}
-                                {event.type === 'red_card' && <RedCardIcon />}
-                            </span>
-                        ))}
-                    </div>
-                </li>
-            ))}
-             {players.length === 0 && <li className="py-4 text-center text-gray-500">Nenhum jogador cadastrado neste time.</li>}
-        </ul>
-    </div>
-  );
+  const renderPlayerList = (players: Player[], teamType: 'home' | 'away') => {
+    const getPlayerShirtNumber = (playerId: string): number | string => {
+        const lineupKey = teamType === 'home' ? 'homeLineup' : 'awayLineup';
+        const lineup = match[lineupKey] || [];
+        const playerEntry = lineup.find(p => p.playerId === playerId);
+        return playerEntry ? playerEntry.shirtNumber : '—';
+    };
+    
+    return (
+      <div className="w-full animate-fade-in">
+          <ul className="divide-y divide-gray-700 bg-gray-900/50 rounded-md">
+              <li className="p-3 grid grid-cols-5 gap-2 text-xs font-bold text-gray-400">
+                  <span className="col-span-3">Jogador</span>
+                  <span className="text-center">Nº</span>
+                  <span className="text-center">Eventos</span>
+              </li>
+              {players.map(player => {
+                  const shirtNumber = getPlayerShirtNumber(player.id);
+                  const events = match.events.filter(e => e.playerId === player.id);
+                  return (
+                      <li key={player.id} className="p-3 grid grid-cols-5 gap-2 items-center">
+                          <div className="col-span-3 flex items-center gap-3">
+                             <img src={player.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt={player.name} className="w-10 h-10 rounded-full object-cover"/>
+                             <div>
+                               <p className="text-sm sm:text-base font-medium text-white truncate">{player.nickname || player.name}</p>
+                               <p className="text-xs text-gray-400">{player.position}</p> 
+                             </div>
+                          </div>
+                          <div className="text-center font-mono text-lg text-gray-300">
+                              {shirtNumber}
+                          </div>
+                          <div className="flex items-center justify-center space-x-2">
+                              {events.length > 0 ? events.map((event, index) => (
+                                  <span key={`${event.playerId}-${index}`} className="flex items-center space-x-1 text-xs text-gray-300">
+                                      {event.type === 'goal' && <SoccerBallIcon />}
+                                      {event.type === 'yellow_card' && <YellowCardIcon />}
+                                      {event.type === 'red_card' && <RedCardIcon />}
+                                  </span>
+                              )) : <span className="text-gray-500 text-xs">—</span>}
+                          </div>
+                      </li>
+                  )
+              })}
+               {players.length === 0 && <li className="py-4 text-center text-gray-500 col-span-5">Nenhum jogador cadastrado neste time.</li>}
+          </ul>
+      </div>
+    );
+  };
 
   return (
     <div className="animate-fade-in">
@@ -135,8 +156,8 @@ const MatchSummaryPage: React.FC<MatchSummaryPageProps> = ({ match, league, onBa
             </div>
             
             <div className="mt-4">
-              {activeTab === 'home' && renderPlayerList(match.homeTeam.players)}
-              {activeTab === 'away' && renderPlayerList(match.awayTeam.players)}
+              {activeTab === 'home' && renderPlayerList(match.homeTeam.players, 'home')}
+              {activeTab === 'away' && renderPlayerList(match.awayTeam.players, 'away')}
             </div>
           </div>
       </div>

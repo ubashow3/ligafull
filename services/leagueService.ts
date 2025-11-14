@@ -51,7 +51,7 @@ const transformLeagues = (data: any[]): League[] => {
                 abbreviation: club.abbreviation,
                 logoUrl: club.logo_url,
                 whatsapp: club.whatsapp,
-                players: (club.players || []).map((p: any) => ({
+                players: (club.players || []).filter(Boolean).map((p: any) => ({
                     id: p.id,
                     name: p.name,
                     position: p.position,
@@ -66,7 +66,9 @@ const transformLeagues = (data: any[]): League[] => {
 
             const clubMap = new Map<string, Club>(clubs.map((c: Club) => [c.id, c]));
             
-            const matches = (champ.matches || []).map((match: any) => {
+            const matches = (champ.matches || [])
+              .filter(match => match && match.home_team_id && match.away_team_id)
+              .map((match: any) => {
                 const homeTeam = clubMap.get(match.home_team_id);
                 const awayTeam = clubMap.get(match.away_team_id);
                 
@@ -192,7 +194,7 @@ const structureChampionships = (data: any[]) => {
         championships: (league.championships || []).map((champ: any) => ({
             ...champ,
             // More robustly filter out invalid club data from the join.
-            clubs: (champ.championship_clubs || []).map((cc: any) => cc.clubs).filter(club => club && club.id)
+            clubs: (champ.championship_clubs || []).map((cc: any) => cc?.clubs).filter(club => club && club.id)
         }))
     }));
 };
