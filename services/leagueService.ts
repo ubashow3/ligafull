@@ -379,12 +379,14 @@ export const updateMatch = async (match: Match, league: League) => {
         }
     });
     
-    // FIX: Map over players, preserving all original data and only updating the goal count.
-    // This prevents `upsert` from nullifying other columns that have NOT NULL constraints.
-    const playersToUpdate = (playersInChampionship || []).map(player => ({
-        ...player,
-        goals_in_championship: allPlayerGoals[player.id] || 0,
-    }));
+    // FIX: Filter out any potentially corrupt player data (missing a name) before mapping.
+    // This prevents the 'not-null constraint' error if bad data exists in the DB.
+    const playersToUpdate = (playersInChampionship || [])
+        .filter(player => player && player.name)
+        .map(player => ({
+            ...player,
+            goals_in_championship: allPlayerGoals[player.id] || 0,
+        }));
     
     // Use a single, robust bulk 'upsert'.
     if (playersToUpdate.length > 0) {
