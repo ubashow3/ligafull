@@ -177,8 +177,20 @@ const App: React.FC = () => {
     setIsLoading(true);
     try {
       await leagueService.createLeague({ name, logoUrl, adminEmail: email, adminPassword: password, state, city });
-      await fetchData();
-      setView({ name: 'home' });
+      
+      // After creating, immediately log in and redirect to admin panel
+      const loggedInLeague = await leagueService.login(email, password);
+      if (loggedInLeague) {
+        await fetchData(); // Refresh all league data
+        setIsAdminMode(true);
+        setAdminLeague(loggedInLeague);
+        setView({ name: 'admin_league', leagueId: loggedInLeague.id });
+      } else {
+        // Fallback in case login fails for some reason
+        await fetchData();
+        setView({ name: 'home' });
+        alert('Liga criada com sucesso! Faça o login para administrar.');
+      }
     } catch (error: any) {
       alert(`Erro ao criar liga: ${error.message}`);
     } finally {
