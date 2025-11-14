@@ -1,7 +1,7 @@
 
 
 import { supabase } from '../supabaseClient';
-import { League, Championship, Club, Match, Player, TechnicalStaff, Official, MatchEvent } from '../types';
+import { League, Championship, Club, Match, Player, TechnicalStaff, Official, MatchEvent, ChampionshipFinancials } from '../types';
 
 // Helper function to generate a slug
 const generateSlug = (name: string) => {
@@ -36,128 +36,163 @@ export const uploadImage = async (file: File): Promise<string> => {
     return data.publicUrl;
 };
 
-// "Bulletproof" data transformation. Uses imperative loops and try-catch blocks
+// "Bulletproof" data transformation. Uses imperative loops with individual try-catch blocks
 // to prevent a single corrupt record from crashing the entire app load.
 const transformLeagues = (data: any[]): League[] => {
-    if (!data || !Array.isArray(data)) return [];
+    if (!Array.isArray(data)) return [];
 
     const leagues: League[] = [];
 
     for (const leagueData of data) {
         try {
-            if (!leagueData || typeof leagueData !== 'object' || !leagueData.id || !leagueData.name) {
+            if (!leagueData || typeof leagueData !== 'object' || !leagueData.id) {
                 console.warn("Skipping invalid league data:", leagueData);
                 continue;
             }
 
-            const validOfficials = (Array.isArray(leagueData.officials) ? leagueData.officials : [])
-                .filter((o: any) => o && typeof o === 'object' && o.id && o.name && o.type);
+            // OFFICIALS
+            let referees: Official[] = [];
+            let tableOfficials: Official[] = [];
+            const officialsMap = new Map<string, string>();
+            try {
+                const rawOfficials = Array.isArray(leagueData.officials) ? leagueData.officials : [];
+                for (const o of rawOfficials) {
+                    if (!o || typeof o !== 'object' || !o.id) continue;
+                    const official: Official = {
+                        id: String(o.id || ''), name: String(o.name || 'Nome Inválido'),
+                        nickname: String(o.nickname || ''), cpf: String(o.cpf || ''),
+                        bankAccount: String(o.bank_account || '')
+                    };
+                    officialsMap.set(official.id, official.name);
+                    if (o.type === 'referee') referees.push(official);
+                    if (o.type === 'table_official') tableOfficials.push(official);
+                }
+            } catch (e) {
+                console.error("Error processing officials for league, continuing with empty officials:", leagueData.id, e);
+                referees = []; tableOfficials = [];
+            }
             
-            const referees = validOfficials.filter((o: any) => o.type === 'referee');
-            const tableOfficials = validOfficials.filter((o: any) => o.type === 'table_official');
-            const officialsMap = new Map<string, string>(validOfficials.map((o: any) => [o.id, o.name]));
+            // CHAMPIONSHIPS
+            let championships: Championship[] = [];
+            try {
+                const rawChampionships = Array.isArray(leagueData.championships) ? leagueData.championships : [];
+                for (const champData of rawChampionships) {
+                    if (!champData || typeof champData !== 'object' || !champData.id) continue;
 
-            const championships: Championship[] = [];
-            const rawChampionships = Array.isArray(leagueData.championships) ? leagueData.championships : [];
-            
-            for (const champData of rawChampionships) {
-                try {
-                    if (!champData || typeof champData !== 'object' || !champData.id || !champData.name) {
-                        console.warn("Skipping invalid championship data:", champData);
-                        continue;
-                    }
-
-                    const clubs: Club[] = [];
-                    const rawClubs = Array.isArray(champData.clubs) ? champData.clubs : [];
-                    for (const clubData of rawClubs) {
-                        try {
-                            if (!clubData || typeof clubData !== 'object' || !clubData.id || !clubData.name) {
-                                console.warn("Skipping invalid club data:", clubData);
-                                continue;
-                            }
-                            clubs.push({
-                                id: clubData.id,
-                                name: clubData.name,
-                                abbreviation: clubData.abbreviation || '---',
-                                logoUrl: clubData.logo_url || '',
-                                whatsapp: clubData.whatsapp,
-                                players: (Array.isArray(clubData.players) ? clubData.players : [])
-                                    .filter((p: any) => p && typeof p === 'object' && p.id && p.name)
-                                    .map((p: any) => ({
-                                        id: p.id, name: p.name, position: p.position || 'Indefinido',
-                                        goals: Number(p.goals_in_championship) || 0,
-                                        photoUrl: p.photo_url || '', birthDate: p.birth_date,
-                                        nickname: p.nickname, cpf: p.cpf,
-                                    })),
-                                technicalStaff: (Array.isArray(clubData.technical_staff) ? clubData.technical_staff : [])
-                                    .filter((ts: any) => ts && typeof ts === 'object' && ts.id && ts.name && ts.role),
-                            });
-                        } catch (e) {
-                            console.error(`Error processing club data, skipping club:`, clubData, e);
-                        }
-                    }
-
-                    const clubMap = new Map<string, Club>(clubs.map(c => [c.id, c]));
-
-                    const matches: Match[] = [];
-                    const rawMatches = Array.isArray(champData.matches) ? champData.matches : [];
-                    for (const matchData of rawMatches) {
-                        try {
-                            if (!matchData || typeof matchData !== 'object' || !matchData.id || !matchData.home_team_id || !matchData.away_team_id) {
-                                console.warn("Skipping invalid match data:", matchData);
-                                continue;
-                            }
+                    // CLUBS
+                    let clubs: Club[] = [];
+                    try {
+                        const rawClubs = Array.isArray(champData.clubs) ? champData.clubs : [];
+                        for (const clubData of rawClubs) {
+                             if (!clubData || typeof clubData !== 'object' || !clubData.id) continue;
                             
-                            const getTeamObject = (teamId: string): Club => {
-                                const team = clubMap.get(teamId);
-                                if (team) return team;
-                                const placeholderName = teamId.startsWith('ph-') ? teamId.substring(3).replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Time Desconhecido';
-                                return { id: teamId, name: placeholderName, abbreviation: 'TBD', logoUrl: '', players: [], technicalStaff: [] };
-                            };
+                            let players: Player[] = [];
+                            try {
+                                const rawPlayers = Array.isArray(clubData.players) ? clubData.players : [];
+                                for(const p of rawPlayers) {
+                                    if (!p || typeof p !== 'object' || !p.id) continue;
+                                    players.push({
+                                        id: String(p.id), name: String(p.name || 'Nome Inválido'),
+                                        position: String(p.position || 'Indefinido'), goals: Number(p.goals_in_championship) || 0,
+                                        photoUrl: String(p.photo_url || ''), birthDate: String(p.birth_date || ''),
+                                        nickname: String(p.nickname || ''), cpf: String(p.cpf || ''),
+                                    });
+                                }
+                            } catch (e) { console.error("Error processing players for club, continuing with empty players:", clubData.id, e); players = []; }
 
-                            const matchDateString = matchData.match_date;
-                            const isValidDate = matchDateString && typeof matchDateString === 'string' && !isNaN(new Date(matchDateString).getTime());
+                            let technicalStaff: TechnicalStaff[] = [];
+                            try {
+                                const rawStaff = Array.isArray(clubData.technical_staff) ? clubData.technical_staff : [];
+                                for(const ts of rawStaff) {
+                                    if (!ts || typeof ts !== 'object' || !ts.id) continue;
+                                    technicalStaff.push({
+                                        id: String(ts.id), name: String(ts.name || 'Nome Inválido'), role: String(ts.role || 'Cargo Inválido'),
+                                    });
+                                }
+                            } catch(e) { console.error("Error processing staff for club, continuing with empty staff:", clubData.id, e); technicalStaff = []; }
 
+                            clubs.push({
+                                id: String(clubData.id), name: String(clubData.name || 'Nome Inválido'),
+                                abbreviation: String(clubData.abbreviation || '---'), logoUrl: String(clubData.logo_url || ''),
+                                whatsapp: String(clubData.whatsapp || ''),
+                                players, technicalStaff,
+                            });
+                        }
+                    } catch (e) { console.error("Error processing clubs for championship, continuing with empty clubs:", champData.id, e); clubs = []; }
+                    
+                    const clubMap = new Map<string, Club>(clubs.map(c => [c.id, c]));
+                    const getTeamObject = (teamId: string | null | undefined): Club => {
+                        const id = String(teamId || '');
+                        if (!id || !clubMap.has(id)) {
+                           const placeholderName = id.startsWith('ph-') ? id.substring(3).replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Time Inválido';
+                           return { id: id || `unknown-${crypto.randomUUID()}`, name: placeholderName, abbreviation: 'TBD', logoUrl: '', players: [], technicalStaff: [] };
+                        }
+                        return clubMap.get(id)!;
+                    };
 
+                    // MATCHES
+                    let matches: Match[] = [];
+                    try {
+                        const rawMatches = Array.isArray(champData.matches) ? champData.matches : [];
+                        for(const matchData of rawMatches) {
+                            if (!matchData || typeof matchData !== 'object' || !matchData.id) continue;
+                            
+                            let events: MatchEvent[] = [];
+                            try {
+                                const rawEvents = Array.isArray(matchData.match_events) ? matchData.match_events : [];
+                                for(const e of rawEvents) {
+                                    if (!e || typeof e !== 'object' || !e.type || !e.player_id) continue;
+                                    events.push({ type: e.type, playerId: String(e.player_id), minute: Number(e.minute) || 0, playerName: '' });
+                                }
+                            } catch(e) { console.error("Error processing events for match, continuing with empty events:", matchData.id, e); events = []; }
+                            
                             matches.push({
-                                id: matchData.id, round: matchData.round ?? 0,
+                                id: String(matchData.id), round: Number(matchData.round) || 1,
                                 homeTeam: getTeamObject(matchData.home_team_id),
                                 awayTeam: getTeamObject(matchData.away_team_id),
-                                homeScore: matchData.home_score, awayScore: matchData.away_score,
-                                date: isValidDate ? matchDateString : new Date(0).toISOString(),
-                                status: matchData.status || 'scheduled',
-                                location: matchData.location || 'A definir',
-                                events: (Array.isArray(matchData.match_events) ? matchData.match_events : [])
-                                    .filter((e: any) => e && typeof e === 'object' && e.type && e.player_id)
-                                    .map((e: any) => ({ type: e.type, playerId: e.player_id, minute: e.minute, playerName: '' })),
-                                referee: officialsMap.get(matchData.referee_id),
-                                assistant1: officialsMap.get(matchData.assistant1_id),
-                                assistant2: officialsMap.get(matchData.assistant2_id),
-                                tableOfficial: officialsMap.get(matchData.table_official_id),
-                                championship_id: matchData.championship_id,
-                                homeLineup: matchData.home_lineup || [], awayLineup: matchData.away_lineup || [],
+                                homeScore: matchData.home_score != null ? Number(matchData.home_score) : null, 
+                                awayScore: matchData.away_score != null ? Number(matchData.away_score) : null,
+                                date: matchData.match_date && !isNaN(new Date(matchData.match_date).getTime()) ? matchData.match_date : new Date().toISOString(),
+                                status: ['scheduled', 'in_progress', 'finished'].includes(matchData.status) ? matchData.status : 'scheduled',
+                                location: String(matchData.location || 'A definir'),
+                                events,
+                                referee: officialsMap.get(String(matchData.referee_id || '')),
+                                assistant1: officialsMap.get(String(matchData.assistant1_id || '')),
+                                assistant2: officialsMap.get(String(matchData.assistant2_id || '')),
+                                tableOfficial: officialsMap.get(String(matchData.table_official_id || '')),
+                                championship_id: String(champData.id),
+                                homeLineup: Array.isArray(matchData.home_lineup) ? matchData.home_lineup : [], 
+                                awayLineup: Array.isArray(matchData.away_lineup) ? matchData.away_lineup : [],
                             });
-                        } catch (e) {
-                            console.error(`Error processing match data, skipping match:`, matchData, e);
                         }
-                    }
+                    } catch(e) { console.error("Error processing matches for championship, continuing with empty matches:", champData.id, e); matches = []; }
 
-                    championships.push({ ...champData, clubs, matches, standings: [] }); // Standings are calculated client-side
-                } catch (e) {
-                    console.error(`Error processing championship data, skipping championship:`, champData, e);
+                    // FINANCIALS
+                    let financials: ChampionshipFinancials | undefined = undefined;
+                    try {
+                        const rawFinancials = champData.financials;
+                        if (rawFinancials && typeof rawFinancials === 'object' && !Array.isArray(rawFinancials)) {
+                            financials = {
+                                refereeFee: Number(rawFinancials.refereeFee) || 0, assistantFee: Number(rawFinancials.assistantFee) || 0,
+                                tableOfficialFee: Number(rawFinancials.tableOfficialFee) || 0, fieldFee: Number(rawFinancials.fieldFee) || 0,
+                                yellowCardFine: Number(rawFinancials.yellowCardFine) || 0, redCardFine: Number(rawFinancials.redCardFine) || 0,
+                                totalCost: Number(rawFinancials.totalCost) || 0, registrationFeePerClub: Number(rawFinancials.registrationFeePerClub) || 0,
+                            };
+                        }
+                    } catch(e) { console.error("Error processing financials for championship, continuing without financials:", champData.id, e); financials = undefined; }
+
+                    championships.push({ 
+                        id: String(champData.id), name: String(champData.name || 'Nome Inválido'),
+                        clubs, matches, standings: [], financials
+                    });
                 }
-            }
-
+            } catch(e) { console.error("Error processing championships for league, continuing with empty championships:", leagueData.id, e); championships = []; }
+            
             leagues.push({
-                ...leagueData,
-                id: leagueData.id,
-                name: leagueData.name,
-                slug: leagueData.slug,
-                adminPassword: leagueData.admin_password_hash,
-                logoUrl: leagueData.logo_url || '',
-                adminEmail: leagueData.admin_email,
-                city: leagueData.city,
-                state: leagueData.state,
+                id: String(leagueData.id), name: String(leagueData.name), slug: String(leagueData.slug || generateSlug(leagueData.name)),
+                logoUrl: String(leagueData.logo_url || ''), adminEmail: String(leagueData.admin_email || ''),
+                adminPassword: String(leagueData.admin_password_hash || ''),
+                city: String(leagueData.city || ''), state: String(leagueData.state || ''),
                 referees, tableOfficials, championships
             });
         } catch (e) {
@@ -188,6 +223,7 @@ const leagueQuery = `
     championships (
         id,
         name,
+        financials,
         championship_clubs (
             clubs (
                 id,
@@ -227,6 +263,8 @@ const leagueQuery = `
             assistant2_id,
             table_official_id,
             championship_id,
+            home_lineup,
+            away_lineup,
             match_events (
                 type,
                 player_id,
@@ -237,32 +275,28 @@ const leagueQuery = `
 `;
 
 // Helper to correctly structure the data from the many-to-many join
-const structureChampionships = (data: any[]) => {
-    if (!data || !Array.isArray(data)) return [];
-    // Ensure every item in data is a valid object before mapping
+const structureChampionships = (data: any[]): any[] => {
+    if (!Array.isArray(data)) return [];
+    
     return data.filter(league => league && typeof league === 'object').map(league => {
         try {
-            const championships = (Array.isArray(league.championships) ? league.championships : []);
-            return {
-                ...league,
-                championships: championships.map((champ: any) => {
-                    try {
-                        // Ensure champ is a valid object
-                        if (!champ || typeof champ !== 'object') return null;
-                        const clubs = (Array.isArray(champ.championship_clubs) ? champ.championship_clubs : [])
-                            // Ensure the link object and the nested club object are valid
-                            .map((cc: any) => (cc && typeof cc === 'object' ? cc.clubs : null))
-                            .filter(club => club && typeof club === 'object' && club.id);
-                        return { ...champ, clubs };
-                    } catch (e) {
-                        console.error("Failed to structure championship clubs for championship:", champ, e);
-                        return null; // Skip corrupted championship
-                    }
-                }).filter(champ => champ !== null) // Filter out any skipped championships
-            };
+            const championships = Array.isArray(league.championships) ? league.championships : [];
+            const structuredChampionships = championships.map((champ: any) => {
+                try {
+                    if (!champ || typeof champ !== 'object') return null;
+                    const clubs = (Array.isArray(champ.championship_clubs) ? champ.championship_clubs : [])
+                        .map((cc: any) => (cc && typeof cc === 'object' && cc.clubs && typeof cc.clubs === 'object' ? cc.clubs : null))
+                        .filter(club => club && typeof club === 'object' && club.id);
+                    return { ...champ, clubs };
+                } catch (e) {
+                    console.error("Failed to structure championship clubs for championship:", champ.id, e);
+                    return { ...champ, clubs: [] }; 
+                }
+            }).filter(champ => champ !== null);
+
+            return { ...league, championships: structuredChampionships };
         } catch (e) {
-            console.error("Failed to structure league championships for league:", league, e);
-            // Return league with empty champs on error to avoid crashing the whole app
+            console.error("Failed to structure league championships for league:", league.id, e);
             return { ...league, championships: [] };
         }
     });
@@ -280,8 +314,8 @@ export const login = async (email: string, pass: string): Promise<League | null>
     if (!email || !pass) return null;
     const { data, error } = await supabase.from('leagues')
         .select(leagueQuery)
-        .ilike('admin_email', email.trim()) // Use .ilike for case-insensitive search and .trim() to remove whitespace
-        .eq('admin_password_hash', pass) // Password comparison remains case-sensitive
+        .ilike('admin_email', email.trim()) 
+        .eq('admin_password_hash', pass) 
         .single();
     if (error || !data) return null;
     const structuredData = structureChampionships([data]);
@@ -295,14 +329,14 @@ export const createLeague = async (leagueData: { name: string, logoUrl: string, 
         name,
         slug: generateSlug(name),
         logo_url: logoUrl,
-        admin_email: adminEmail.trim(), // Trim email on creation
-        admin_password_hash: adminPassword, // Don't trim password here, it might be intentional
+        admin_email: adminEmail.trim(), 
+        admin_password_hash: adminPassword, 
         state,
         city,
     }).select().single();
 
     if (error) {
-        if (error.code === '23505') { // Unique constraint violation
+        if (error.code === '23505') { 
             if (error.message.includes('leagues_slug_key')) {
                 throw new Error('Já existe uma liga com este nome (slug).');
             }
@@ -342,8 +376,18 @@ export const createChampionship = async (leagueId: string, champName: string): P
     return { ...data, clubs: [], matches: [], standings: [] };
 };
 
+export const saveChampionshipFinancials = async (championshipId: string, financials: ChampionshipFinancials) => {
+    const { error } = await supabase
+        .from('championships')
+        .update({ financials })
+        .eq('id', championshipId);
+    if (error) {
+        console.error("Supabase saveChampionshipFinancials error:", error);
+        throw new Error(`Falha ao salvar dados financeiros: ${error.message}`);
+    }
+};
+
 export const addClubToChampionship = async (championshipId: string, clubData: { name: string, abbreviation: string, logoUrl: string, whatsapp: string }) => {
-    // 1. Create the club
     const { data: newClub, error: clubError } = await supabase.from('clubs').insert({
         id: crypto.randomUUID(),
         name: clubData.name,
@@ -353,7 +397,6 @@ export const addClubToChampionship = async (championshipId: string, clubData: { 
     }).select().single();
     if (clubError) throw clubError;
 
-    // 2. Link club to championship
     const { error: linkError } = await supabase.from('championship_clubs').insert({
         championship_id: championshipId,
         club_id: newClub.id,
@@ -394,6 +437,8 @@ export const updateMatch = async (match: Match, league: League) => {
         table_official_id: match.tableOfficial ? officialsMap.get(match.tableOfficial) : null,
         home_team_id: match.homeTeam.id,
         away_team_id: match.awayTeam.id,
+        home_lineup: match.homeLineup,
+        away_lineup: match.awayLineup,
     }).eq('id', match.id);
     if (matchError) throw matchError;
 
@@ -411,7 +456,6 @@ export const updateMatch = async (match: Match, league: League) => {
         if (insertError) throw insertError;
     }
 
-    // Recalculate top scorers every time the summary is saved (draft or final)
     const championshipId = match.championship_id;
     if (!championshipId) {
         console.warn("Could not update player goals: Championship ID not found in match object.");
@@ -427,7 +471,6 @@ export const updateMatch = async (match: Match, league: League) => {
     const clubIds = (championshipClubs || []).map(cc => cc.club_id);
     if (clubIds.length === 0) return;
 
-    // FIX: Fetch all player data to ensure all non-nullable fields are present in the upsert payload.
     const { data: playersInChampionship, error: playersError } = await supabase
         .from('players')
         .select('*')
@@ -450,8 +493,6 @@ export const updateMatch = async (match: Match, league: League) => {
         }
     });
     
-    // FIX: Filter out any potentially corrupt player data (missing a name) before mapping.
-    // This prevents the 'not-null constraint' error if bad data exists in the DB.
     const playersToUpdate = (playersInChampionship || [])
         .filter(player => player && player.name)
         .map(player => ({
@@ -459,7 +500,6 @@ export const updateMatch = async (match: Match, league: League) => {
             goals_in_championship: allPlayerGoals[player.id] || 0,
         }));
     
-    // Use a single, robust bulk 'upsert'.
     if (playersToUpdate.length > 0) {
         const { error: upsertError } = await supabase
             .from('players')

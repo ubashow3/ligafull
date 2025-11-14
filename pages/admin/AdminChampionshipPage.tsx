@@ -1,13 +1,13 @@
 import React, { useState, useMemo } from 'react';
-// FIX: Import ChampionshipWizardConfig and remove unused ChampionshipFormat.
-import { Championship, League, Match, Player, TechnicalStaff, ChampionshipWizardConfig } from '../../types';
+import { Championship, League, Match, Player, TechnicalStaff, ChampionshipWizardConfig, ChampionshipFinancials } from '../../types';
 import AdminStandingsTab from '../../components/admin/championship/AdminStandingsTab';
 import AdminMatchesTab from '../../components/admin/championship/AdminMatchesTab';
 import AdminClubsTab from '../../components/admin/championship/AdminClubsTab';
 import AdminTopScorersTab from '../../components/admin/championship/AdminTopScorersTab';
+import AdminFinancialsTab from '../../components/admin/championship/AdminFinancialsTab';
 import PlayerDetailsModal from '../../components/PlayerDetailsModal';
 
-type ActiveTab = 'matches' | 'clubs' | 'standings' | 'top_scorers';
+type ActiveTab = 'matches' | 'clubs' | 'standings' | 'top_scorers' | 'financials';
 
 // Moved to top level to prevent re-creation on render
 const TabButton: React.FC<{ tabName: ActiveTab, label: string, activeTab: ActiveTab, onClick: (tab: ActiveTab) => void }> = ({ tabName, label, activeTab, onClick }) => (
@@ -25,10 +25,10 @@ interface AdminChampionshipPageProps {
   onBack: () => void;
   onSelectMatch: (match: Match) => void;
   onCreateClub: (name: string, abbreviation: string, logoUrl: string, whatsapp: string) => void;
-  // FIX: Updated prop to use ChampionshipWizardConfig type.
   onGenerateMatches: (config: ChampionshipWizardConfig) => void;
   onUpdateMatch: (updatedMatch: Match) => void;
   onNavigateToCreateMatches: () => void;
+  onSaveFinancials: (championshipId: string, financials: ChampionshipFinancials) => void;
   // Player props
   onUpdatePlayer: (clubId: string, updatedPlayer: Player) => void;
   onCreatePlayer: (clubId: string, name: string, position: string, nickname: string, cpf: string, photoUrl: string) => void;
@@ -48,6 +48,7 @@ const AdminChampionshipPage: React.FC<AdminChampionshipPageProps> = ({
   onGenerateMatches,
   onUpdateMatch,
   onNavigateToCreateMatches,
+  onSaveFinancials,
   onUpdatePlayer,
   onCreatePlayer,
   onDeletePlayer,
@@ -91,6 +92,7 @@ const AdminChampionshipPage: React.FC<AdminChampionshipPageProps> = ({
           <TabButton tabName="clubs" label="Clubes" activeTab={activeTab} onClick={setActiveTab} />
           <TabButton tabName="standings" label="Classificação" activeTab={activeTab} onClick={setActiveTab} />
           <TabButton tabName="top_scorers" label="Artilharia" activeTab={activeTab} onClick={setActiveTab} />
+          <TabButton tabName="financials" label="Financeiro" activeTab={activeTab} onClick={setActiveTab} />
         </nav>
       </div>
 
@@ -125,6 +127,12 @@ const AdminChampionshipPage: React.FC<AdminChampionshipPageProps> = ({
         )}
         {activeTab === 'standings' && <AdminStandingsTab standings={championship.standings} />}
         {activeTab === 'top_scorers' && <AdminTopScorersTab topScorers={topScorers} />}
+        {activeTab === 'financials' && (
+            <AdminFinancialsTab 
+                championship={championship}
+                onSave={(financials) => onSaveFinancials(championship.id, financials)}
+            />
+        )}
       </div>
 
       <PlayerDetailsModal

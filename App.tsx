@@ -1,7 +1,7 @@
 
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { League, Championship, Club, Match, Player, TechnicalStaff, Official, ChampionshipWizardConfig, Standing } from './types';
+import { League, Championship, Club, Match, Player, TechnicalStaff, Official, ChampionshipWizardConfig, Standing, ChampionshipFinancials } from './types';
 import * as leagueService from './services/leagueService';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -228,6 +228,15 @@ const App: React.FC = () => {
         await fetchData();
     } catch (error: any) {
         alert(`Erro ao criar campeonato: ${error.message}`);
+    }
+  };
+
+  const handleSaveChampionshipFinancials = async (championshipId: string, financials: ChampionshipFinancials) => {
+    try {
+      await leagueService.saveChampionshipFinancials(championshipId, financials);
+      await fetchData(); // Refresh data
+    } catch (error) {
+      alert(`Erro ao salvar dados financeiros: ${(error as Error).message}`);
     }
   };
 
@@ -520,6 +529,7 @@ const App: React.FC = () => {
                                                 onCreateStaff={handleCreateStaff}
                                                 onUpdateStaff={handleUpdateStaff}
                                                 onDeleteStaff={handleDeleteStaff}
+                                                onSaveFinancials={handleSaveChampionshipFinancials}
                                                />;
                 break;
 
