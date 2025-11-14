@@ -227,8 +227,6 @@ const leagueQuery = `
             assistant2_id,
             table_official_id,
             championship_id,
-            home_lineup,
-            away_lineup,
             match_events (
                 type,
                 player_id,
@@ -396,8 +394,6 @@ export const updateMatch = async (match: Match, league: League) => {
         table_official_id: match.tableOfficial ? officialsMap.get(match.tableOfficial) : null,
         home_team_id: match.homeTeam.id,
         away_team_id: match.awayTeam.id,
-        home_lineup: match.homeLineup,
-        away_lineup: match.awayLineup,
     }).eq('id', match.id);
     if (matchError) throw matchError;
 
