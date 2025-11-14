@@ -341,3 +341,50 @@ export const updateStaff = async (staff: TechnicalStaff) => {
 export const deleteStaff = async (id: string) => {
     await supabase.from('technical_staff').delete().eq('id', id);
 };
+
+export const createOrGetPlaceholderClub = async (clubName: string): Promise<Club> => {
+    const { data: existingClub, error: selectError } = await supabase
+        .from('clubs')
+        .select('*')
+        .eq('name', clubName)
+        .maybeSingle();
+
+    if (selectError) throw selectError;
+
+    if (existingClub) {
+        return {
+            id: existingClub.id,
+            name: existingClub.name,
+            abbreviation: existingClub.abbreviation,
+            logoUrl: existingClub.logo_url,
+            whatsapp: existingClub.whatsapp,
+            players: [],
+            technicalStaff: []
+        };
+    }
+
+    const newPlaceholderClub = {
+        id: crypto.randomUUID(),
+        name: clubName,
+        abbreviation: 'TBD',
+        logo_url: ''
+    };
+    
+    const { data: newClub, error: insertError } = await supabase
+        .from('clubs')
+        .insert(newPlaceholderClub)
+        .select()
+        .single();
+
+    if (insertError) throw insertError;
+    
+    return {
+        id: newClub.id,
+        name: newClub.name,
+        abbreviation: newClub.abbreviation,
+        logoUrl: newClub.logo_url,
+        whatsapp: newClub.whatsapp,
+        players: [],
+        technicalStaff: []
+    };
+};

@@ -394,27 +394,19 @@ const App: React.FC = () => {
           
           let lastRound = generatedMatches.reduce((max, m) => Math.max(max, m.round), 0);
           
-          // Helper to create placeholder teams for playoffs
-          const createPlaceholderTeam = (name: string): Club => ({
-              id: `ph-${name.toLowerCase().replace(/\s/g, '-')}`,
-              name: name,
-              abbreviation: 'TBD',
-              logoUrl: '',
-              players: [],
-              technicalStaff: []
-          });
-
-          // FIX: Add explicit return type 'Match' to ensure the 'status' property
-          // is correctly typed as a literal and not widened to 'string'.
-          const createPlayoffMatch = (round: number, homePlaceholder: string, awayPlaceholder: string): Match => {
+          const createPlayoffMatch = async (round: number, homePlaceholder: string, awayPlaceholder: string): Promise<Match> => {
               const matchDate = new Date();
               matchDate.setDate(new Date().getDate() + (round * 7));
               matchDate.setHours(16, 0, 0, 0);
+              
+              const homeTeam = await leagueService.createOrGetPlaceholderClub(homePlaceholder);
+              const awayTeam = await leagueService.createOrGetPlaceholderClub(awayPlaceholder);
+
               return {
                   id: crypto.randomUUID(),
                   round: round,
-                  homeTeam: createPlaceholderTeam(homePlaceholder),
-                  awayTeam: createPlaceholderTeam(awayPlaceholder),
+                  homeTeam: homeTeam,
+                  awayTeam: awayTeam,
                   homeScore: null,
                   awayScore: null,
                   date: matchDate.toISOString(),
@@ -425,23 +417,28 @@ const App: React.FC = () => {
               };
           };
 
+          const playoffPromises: Promise<Match>[] = [];
+
           if (totalQualifiers >= 8) { // Quarter-finals
               lastRound++;
-              generatedMatches.push(createPlayoffMatch(lastRound, '1º Colocado', '8º Colocado'));
-              generatedMatches.push(createPlayoffMatch(lastRound, '2º Colocado', '7º Colocado'));
-              generatedMatches.push(createPlayoffMatch(lastRound, '3º Colocado', '6º Colocado'));
-              generatedMatches.push(createPlayoffMatch(lastRound, '4º Colocado', '5º Colocado'));
+              playoffPromises.push(createPlayoffMatch(lastRound, '1º Colocado', '8º Colocado'));
+              playoffPromises.push(createPlayoffMatch(lastRound, '2º Colocado', '7º Colocado'));
+              playoffPromises.push(createPlayoffMatch(lastRound, '3º Colocado', '6º Colocado'));
+              playoffPromises.push(createPlayoffMatch(lastRound, '4º Colocado', '5º Colocado'));
           }
           if (totalQualifiers >= 4) { // Semi-finals
               lastRound++;
               const qfPrefix = totalQualifiers >= 8 ? "QF" : "Colocado";
-              generatedMatches.push(createPlayoffMatch(lastRound, `Vencedor ${qfPrefix} 1`, `Vencedor ${qfPrefix} 4`));
-              generatedMatches.push(createPlayoffMatch(lastRound, `Vencedor ${qfPrefix} 2`, `Vencedor ${qfPrefix} 3`));
+              playoffPromises.push(createPlayoffMatch(lastRound, `Vencedor ${qfPrefix} 1`, `Vencedor ${qfPrefix} 4`));
+              playoffPromises.push(createPlayoffMatch(lastRound, `Vencedor ${qfPrefix} 2`, `Vencedor ${qfPrefix} 3`));
           }
           if (totalQualifiers >= 2) { // Final
               lastRound++;
-              generatedMatches.push(createPlayoffMatch(lastRound, 'Vencedor SF 1', 'Vencedor SF 2'));
+              playoffPromises.push(createPlayoffMatch(lastRound, 'Vencedor SF 1', 'Vencedor SF 2'));
           }
+
+          const playoffMatches = await Promise.all(playoffPromises);
+          generatedMatches.push(...playoffMatches);
       }
 
       // 5. Call the service to save the matches
