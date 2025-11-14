@@ -1,3 +1,4 @@
+
 export interface Player {
   id: string;
   name: string;
@@ -55,7 +56,6 @@ export interface Match {
     assistant1?: string;
     assistant2?: string;
     tableOfficial?: string;
-    // FIX: Add optional championship_id to be available on matches fetched from the DB.
     championship_id?: string;
 }
 
@@ -74,23 +74,16 @@ export interface Standing {
     points: number;
 }
 
+// FIX: Added ChampionshipFinancials interface to be used in FinancialsTab.tsx
 export interface ChampionshipFinancials {
-    registrationFeePerClub: number;
-    totalCost: number;
     refereeFee: number;
     assistantFee: number;
     tableOfficialFee: number;
     fieldFee: number;
     yellowCardFine: number;
     redCardFine: number;
-}
-
-export interface ClubFinancials {
-    clubId: string;
-    registrationFeeDue: number;
-    totalFines: number;
-    amountPaid: number;
-    balance: number;
+    totalCost: number;
+    registrationFeePerClub: number;
 }
 
 export interface Championship {
@@ -99,8 +92,7 @@ export interface Championship {
     clubs: Club[];
     matches: Match[];
     standings: Standing[];
-    financials: ChampionshipFinancials | null;
-    clubFinancials: ClubFinancials[] | null;
+    financials?: ChampionshipFinancials;
 }
 
 export interface League {

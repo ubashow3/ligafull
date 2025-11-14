@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { League, Championship, Official, ChampionshipFinancials } from '../../types';
+import { League, Championship, Official } from '../../types';
 import ManageOfficialsTab from '../../components/admin/league/ManageOfficialsTab';
-import FinancialsTab from '../../components/admin/league/FinancialsTab';
 
 interface AdminLeaguePageProps {
   league: League;
@@ -10,10 +9,9 @@ interface AdminLeaguePageProps {
   onCreateOfficial: (type: 'referees' | 'tableOfficials', data: Omit<Official, 'id'>) => void;
   onUpdateOfficial: (type: 'referees' | 'tableOfficials', data: Official) => void;
   onDeleteOfficial: (type: 'referees' | 'tableOfficials', id: string) => void;
-  onSaveFinancials: (championshipId: string, financials: ChampionshipFinancials) => void;
 }
 
-type ActiveTab = 'championships' | 'referees' | 'tableOfficials' | 'financials';
+type ActiveTab = 'championships' | 'referees' | 'tableOfficials';
 
 // Moved to top level to prevent re-creation on render
 const TabButton: React.FC<{tabName: ActiveTab, label: string, activeTab: ActiveTab, onClick: (tab: ActiveTab) => void}> = ({ tabName, label, activeTab, onClick }) => (
@@ -31,8 +29,7 @@ const AdminLeaguePage: React.FC<AdminLeaguePageProps> = ({
     onCreateChampionship,
     onCreateOfficial,
     onUpdateOfficial,
-    onDeleteOfficial,
-    onSaveFinancials
+    onDeleteOfficial
 }) => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('championships');
   const [showAddChampForm, setShowAddChampForm] = useState(false);
@@ -61,7 +58,6 @@ const AdminLeaguePage: React.FC<AdminLeaguePageProps> = ({
           <TabButton tabName="championships" label="Campeonatos" activeTab={activeTab} onClick={setActiveTab} />
           <TabButton tabName="referees" label="Árbitros" activeTab={activeTab} onClick={setActiveTab} />
           <TabButton tabName="tableOfficials" label="Mesários" activeTab={activeTab} onClick={setActiveTab} />
-          <TabButton tabName="financials" label="Financeiro" activeTab={activeTab} onClick={setActiveTab} />
         </nav>
       </div>
       
@@ -129,12 +125,6 @@ const AdminLeaguePage: React.FC<AdminLeaguePageProps> = ({
                 onCreate={(data) => onCreateOfficial('tableOfficials', data)}
                 onUpdate={(data) => onUpdateOfficial('tableOfficials', data)}
                 onDelete={(id) => onDeleteOfficial('tableOfficials', id)}
-            />
-        )}
-        {activeTab === 'financials' && (
-            <FinancialsTab
-                league={league}
-                onSaveFinancials={onSaveFinancials}
             />
         )}
       </div>

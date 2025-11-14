@@ -28,7 +28,6 @@ interface AdminChampionshipPageProps {
   // FIX: Updated prop to use ChampionshipWizardConfig type.
   onGenerateMatches: (config: ChampionshipWizardConfig) => void;
   onUpdateMatch: (updatedMatch: Match) => void;
-  onUpdateClubPayment: (clubId: string, amount: number) => void;
   onNavigateToCreateMatches: () => void;
   // Player props
   onUpdatePlayer: (clubId: string, updatedPlayer: Player) => void;
@@ -48,7 +47,6 @@ const AdminChampionshipPage: React.FC<AdminChampionshipPageProps> = ({
   onCreateClub,
   onGenerateMatches,
   onUpdateMatch,
-  onUpdateClubPayment,
   onNavigateToCreateMatches,
   onUpdatePlayer,
   onCreatePlayer,
@@ -123,7 +121,6 @@ const AdminChampionshipPage: React.FC<AdminChampionshipPageProps> = ({
                 onUpdateStaff={onUpdateStaff}
                 onDeleteStaff={onDeleteStaff}
                 onPlayerClick={setSelectedPlayer}
-                onUpdateClubPayment={onUpdateClubPayment}
             />
         )}
         {activeTab === 'standings' && <AdminStandingsTab standings={championship.standings} />}

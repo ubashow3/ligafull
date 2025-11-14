@@ -1,5 +1,6 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
-import { League, Championship, Club, Match, Player, TechnicalStaff, Official, ChampionshipFinancials, ChampionshipWizardConfig, Standing, MatchEvent } from './types';
+import { League, Championship, Club, Match, Player, TechnicalStaff, Official, ChampionshipWizardConfig, Standing, MatchEvent } from './types';
 import * as leagueService from './services/leagueService';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -84,9 +85,17 @@ const App: React.FC = () => {
     } catch (error: any) {
       console.error("Failed to load data:", error);
       // Enhanced error message extraction from Supabase error object
-      const details = error.details ? `\nDetalhes: ${error.details}` : '';
-      const hint = error.hint ? `\nDica: ${error.hint}` : '';
-      const errorMessage = `${error.message}${details}${hint}`;
+      let errorMessage = 'Ocorreu um erro desconhecido.';
+      if (typeof error === 'object' && error !== null) {
+          const message = error.message || 'No message provided';
+          const details = error.details ? `\nDetalhes: ${error.details}` : '';
+          const hint = error.hint ? `\nDica: ${error.hint}` : '';
+          const code = error.code ? `\nCódigo: ${error.code}`: '';
+          const fullError = JSON.stringify(error, null, 2);
+          errorMessage = `${message}${details}${hint}${code}\n\n${fullError}`;
+      } else if (typeof error === 'string') {
+          errorMessage = error;
+      }
       alert(`Não foi possível carregar os dados das ligas. Verifique a conexão com o banco de dados.\n\n${errorMessage}`);
     } finally {
       setIsAppLoading(false);
@@ -212,9 +221,14 @@ const App: React.FC = () => {
       setSelectedLeague(newLeague);
       setCurrentPage('admin_league');
       setIsAdminModalOpen(false);
-    } catch (error) {
+    } catch (error: any) {
         // Display a more specific error message from the service layer.
-        const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
+        let errorMessage = "Ocorreu um erro desconhecido.";
+        if (typeof error === 'object' && error !== null) {
+            errorMessage = error.message || JSON.stringify(error);
+        } else if (error) {
+            errorMessage = error.toString();
+        }
         alert(`Erro ao criar a liga: ${errorMessage}`);
     } finally {
         setIsCreatingLeague(false);
@@ -223,7 +237,7 @@ const App: React.FC = () => {
 
   const handleCreateChampionship = async (leagueId: string, champName: string) => {
     try {
-      const newChampionship = await leagueService.createChampionship(leagueId, champName);
+      await leagueService.createChampionship(leagueId, champName);
       await fetchData(); // Refetch all data to ensure consistency
     } catch (error) {
       alert("Erro ao criar o campeonato.");
@@ -406,10 +420,9 @@ const App: React.FC = () => {
   };
 
   const handleUpdateMatch = async (updatedMatch: Match) => {
-    if (!selectedChampionship) return;
+    if (!selectedChampionship || !selectedLeague) return;
     try {
-      // The update service needs to handle recalculations or the refetch will
-      await leagueService.updateMatch(updatedMatch, selectedChampionship.clubs);
+      await leagueService.updateMatch(updatedMatch, selectedLeague);
       await fetchData();
     } catch(error) {
         alert("Erro ao atualizar a partida.");
@@ -493,34 +506,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSaveFinancials = async (championshipId: string, financials: ChampionshipFinancials) => {
-       if (!selectedChampionship) return;
-       try {
-            // Client-side calculation remains, but now we persist it.
-            const { registrationFeePerClub, yellowCardFine, redCardFine } = financials;
-            const costPerGame = financials.refereeFee + (financials.assistantFee * 2) + financials.tableOfficialFee + financials.fieldFee;
-            const totalCost = costPerGame * selectedChampionship.matches.length;
-            const finalRegFee = selectedChampionship.clubs.length > 0 ? totalCost / selectedChampionship.clubs.length : 0;
-            
-            const finalFinancials: ChampionshipFinancials = { ...financials, totalCost, registrationFeePerClub: finalRegFee };
-
-            await leagueService.saveFinancials(championshipId, finalFinancials, selectedChampionship.clubs);
-            await fetchData();
-       } catch (error) {
-            alert("Erro ao salvar dados financeiros.");
-       }
-  };
-
-  const handleUpdateClubPayment = async (clubId: string, amount: number) => {
-       if (!selectedChampionship) return;
-       try {
-            await leagueService.updateClubPayment(selectedChampionship.id, clubId, amount);
-            await fetchData();
-       } catch (error) {
-            alert("Erro ao atualizar pagamento.");
-       }
-  };
-
   // Render Logic
   const renderPage = () => {
     if (isAppLoading) {
@@ -550,10 +535,10 @@ const App: React.FC = () => {
         return <CreateLeaguePage onBack={handleBack} onCreateLeague={handleCreateLeague} isLoading={isCreatingLeague} />;
       // Admin Pages
       case 'admin_league':
-        return selectedLeague && <AdminLeaguePage league={selectedLeague} onSelectChampionship={handleSelectChampionship} onCreateChampionship={handleCreateChampionship} onCreateOfficial={handleCreateOfficial} onUpdateOfficial={handleUpdateOfficial} onDeleteOfficial={handleDeleteOfficial} onSaveFinancials={handleSaveFinancials} />;
+        return selectedLeague && <AdminLeaguePage league={selectedLeague} onSelectChampionship={handleSelectChampionship} onCreateChampionship={handleCreateChampionship} onCreateOfficial={handleCreateOfficial} onUpdateOfficial={handleUpdateOfficial} onDeleteOfficial={handleDeleteOfficial} />;
       case 'admin_championship':
         const adminChampWithStandings = selectedChampionship ? { ...selectedChampionship, standings: calculateStandings(selectedChampionship.clubs, selectedChampionship.matches)} : null;
-        return selectedLeague && adminChampWithStandings && <AdminChampionshipPage league={selectedLeague} championship={adminChampWithStandings} onBack={handleBack} onSelectMatch={handleSelectMatch} onCreateClub={handleCreateClub} onGenerateMatches={handleGenerateMatches} onUpdateMatch={handleUpdateMatch} onUpdateClubPayment={handleUpdateClubPayment} onUpdatePlayer={handleUpdatePlayer} onCreatePlayer={handleCreatePlayer} onDeletePlayer={handleDeletePlayer} onCreateStaff={handleCreateStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onNavigateToCreateMatches={handleNavigateToCreateMatches} />;
+        return selectedLeague && adminChampWithStandings && <AdminChampionshipPage league={selectedLeague} championship={adminChampWithStandings} onBack={handleBack} onSelectMatch={handleSelectMatch} onCreateClub={handleCreateClub} onGenerateMatches={handleGenerateMatches} onUpdateMatch={handleUpdateMatch} onUpdatePlayer={handleUpdatePlayer} onCreatePlayer={handleCreatePlayer} onDeletePlayer={handleDeletePlayer} onCreateStaff={handleCreateStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onNavigateToCreateMatches={handleNavigateToCreateMatches} />;
       case 'admin_match':
         return selectedLeague && selectedChampionship && selectedMatch && <AdminMatchSummaryPage league={selectedLeague} championship={selectedChampionship} match={selectedMatch} onBack={handleBack} onUpdateMatch={handleUpdateMatch} />;
       case 'admin_create_matches':

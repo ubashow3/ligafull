@@ -1,5 +1,6 @@
+
 import { supabase } from '../supabaseClient';
-import { League, Championship, Club, Match, Player, TechnicalStaff, Official, ChampionshipFinancials, MatchEvent } from '../types';
+import { League, Championship, Club, Match, Player, TechnicalStaff, Official, MatchEvent } from '../types';
 
 // Helper function to generate a slug
 const generateSlug = (name: string) => {
@@ -8,26 +9,33 @@ const generateSlug = (name: string) => {
 
 // Helper to transform Supabase data into the nested structure the app expects
 const transformLeagues = (data: any[]): League[] => {
+    if (!data) return [];
     return data.map(league => {
+        const referees = (league.officials || []).filter((o: any) => o.type === 'referee');
+        const tableOfficials = (league.officials || []).filter((o: any) => o.type === 'table_official');
+        const officialsMap = new Map<string, string>((league.officials || []).map((o: any) => [o.id, o.name]));
+
         const championships = (league.championships || []).map((champ: any) => {
-            const clubs = (champ.championship_clubs || []).map((cc: any) => ({
-                ...(cc.clubs || {}),
-                players: cc.clubs?.players || [],
-                technicalStaff: cc.clubs?.technical_staff || [],
+            const clubs = (champ.clubs || []).map((club: any) => ({
+                ...club,
+                logoUrl: club.logo_url,
+                players: (club.players || []).map((p: any) => ({
+                    ...p,
+                    goals: p.goals_in_championship,
+                    photoUrl: p.photo_url,
+                    birthDate: p.birth_date,
+                })),
+                technicalStaff: (club.technical_staff || []).map((ts: any) => ({...ts})),
             }));
 
-            // Create a map for quick club lookups
             const clubMap = new Map<string, Club>(clubs.map((c: Club) => [c.id, c]));
             
-            // Hydrate matches with full club objects
             const matches = (champ.matches || []).map((match: any) => {
                 const homeTeam = clubMap.get(match.home_team_id);
                 const awayTeam = clubMap.get(match.away_team_id);
                 
-                // If a team is not found (e.g., placeholder in playoffs), create a basic object
-                const getTeamObject = (teamId: string, teamData?: Club) => {
+                const getTeamObject = (teamId: string, teamData?: Club): Club => {
                     if (teamData) return teamData;
-                    // For placeholder teams like 'Vencedor Jogo 1'
                     if (teamId.startsWith('ph-')) {
                         return { id: teamId, name: teamId.substring(3).replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), abbreviation: 'TBD', logoUrl: '', players: [], technicalStaff: [] };
                     }
@@ -38,34 +46,96 @@ const transformLeagues = (data: any[]): League[] => {
                     ...match,
                     homeTeam: getTeamObject(match.home_team_id, homeTeam),
                     awayTeam: getTeamObject(match.away_team_id, awayTeam),
-                    events: match.match_events || [],
+                    date: match.match_date,
+                    events: (match.match_events || []).map((e: any) => ({ ...e, playerId: e.player_id })),
+                    referee: officialsMap.get(match.referee_id),
+                    assistant1: officialsMap.get(match.assistant1_id),
+                    assistant2: officialsMap.get(match.assistant2_id),
+                    tableOfficial: officialsMap.get(match.table_official_id),
                 };
             });
+
             return { ...champ, clubs, matches };
         });
         
         return {
             ...league,
-            adminPassword: league.admin_password, // map snake_case to camelCase
+            adminPassword: league.admin_password_hash,
             logoUrl: league.logo_url,
             adminEmail: league.admin_email,
-            referees: (league.officials || []).filter((o: any) => o.type === 'referee'),
-            tableOfficials: (league.officials || []).filter((o: any) => o.type === 'table_official'),
+            referees,
+            tableOfficials,
             championships
         };
     });
 };
 
-// FIX: Added `!inner` to financials to explicitly tell Supabase how to join.
+
 const leagueQuery = `
-    id, name, slug, logo_url, admin_email, admin_password, city, state, latitude, longitude,
-    officials (*),
+    id,
+    name,
+    slug,
+    logo_url,
+    admin_email,
+    admin_password_hash,
+    city,
+    state,
+    latitude,
+    longitude,
+    officials (
+        id,
+        name,
+        nickname,
+        cpf,
+        bank_account,
+        type
+    ),
     championships (
-        *,
-        championship_clubs ( clubs (*, players(*), technical_staff(*)) ),
-        matches ( *, home_team_id, away_team_id, match_events(*) ),
-        financials:championship_financials!inner(*),
-        clubFinancials:club_financials(*)
+        id,
+        name,
+        clubs (
+            id,
+            name,
+            abbreviation,
+            logo_url,
+            whatsapp,
+            players (
+                id,
+                name,
+                position,
+                goals_in_championship,
+                photo_url,
+                birth_date,
+                nickname,
+                cpf
+            ),
+            technical_staff (
+                id,
+                name,
+                role
+            )
+        ),
+        matches (
+            id,
+            round,
+            home_team_id,
+            away_team_id,
+            home_score,
+            away_score,
+            match_date,
+            status,
+            location,
+            referee_id,
+            assistant1_id,
+            assistant2_id,
+            table_official_id,
+            championship_id,
+            match_events (
+                type,
+                player_id,
+                minute
+            )
+        )
     )
 `;
 
@@ -80,10 +150,7 @@ export const login = async (email: string, pass: string): Promise<League | null>
     const { data, error } = await supabase.from('leagues')
         .select(leagueQuery)
         .eq('admin_email', email)
-        // SECURITY WARNING: Comparing passwords in plain text is highly insecure.
-        // This method is vulnerable to various attacks.
-        // It's strongly recommended to migrate to Supabase Auth for secure password handling.
-        .eq('admin_password', pass)
+        .eq('admin_password_hash', pass)
         .single();
     if (error || !data) return null;
     return transformLeagues([data])[0];
@@ -96,19 +163,16 @@ export const createLeague = async (leagueData: { name: string, logoUrl: string, 
         slug: generateSlug(name),
         logo_url: logoUrl || `https://picsum.photos/seed/${Date.now()}/200/200`,
         admin_email: adminEmail,
-        // SECURITY WARNING: Storing passwords in plain text is highly insecure.
-        // Consider using Supabase Auth for proper user management and password hashing.
-        admin_password: adminPassword,
+        admin_password_hash: adminPassword,
         city,
         state,
     }).select().single();
 
     if (error) {
         if (error.code === '23505') { // Unique constraint violation
-            if (error.message.includes('leagues_name_key')) {
-                throw new Error('Já existe uma liga com este nome.');
+            if (error.message.includes('leagues_slug_key')) {
+                throw new Error('Já existe uma liga com este nome (slug).');
             }
-            // Note: You might need to adjust this key name based on your actual table definition
             if (error.message.includes('leagues_admin_email_key') || error.message.includes('leagues_admin_email_idx')) {
                 throw new Error('Este e-mail já está sendo utilizado por outra liga.');
             }
@@ -120,15 +184,13 @@ export const createLeague = async (leagueData: { name: string, logoUrl: string, 
         throw new Error("Não foi possível obter os dados da liga após a criação.");
     }
 
-    // FIX: Return a simple, correctly-structured League object.
-    // transformLeagues expects a complex nested structure that a simple insert does not return.
     return {
         id: data.id,
         name: data.name,
         slug: data.slug,
         logoUrl: data.logo_url,
         adminEmail: data.admin_email,
-        adminPassword: data.admin_password,
+        adminPassword: data.admin_password_hash,
         city: data.city,
         state: data.state,
         championships: [],
@@ -143,7 +205,7 @@ export const createChampionship = async (leagueId: string, champName: string): P
         league_id: leagueId
     }).select().single();
     if (error) throw error;
-    return { ...data, clubs: [], matches: [], standings: [], financials: null, clubFinancials: null };
+    return { ...data, clubs: [], matches: [], standings: [] };
 };
 
 export const addClubToChampionship = async (championshipId: string, clubData: { name: string, abbreviation: string, logoUrl: string, whatsapp: string }) => {
@@ -171,29 +233,34 @@ export const generateMatches = async (championshipId: string, matches: Match[]) 
         home_team_id: (m.homeTeam as Club).id,
         away_team_id: (m.awayTeam as Club).id,
         status: m.status,
-        date: m.date,
+        match_date: m.date,
         location: m.location,
     }));
     const { error } = await supabase.from('matches').insert(matchesToInsert);
     if (error) throw error;
 };
 
-export const updateMatch = async (match: Match, clubs: Club[]) => {
-    // 1. Update match score, status, details
+export const updateMatch = async (match: Match, league: League) => {
+    // FIX: Explicitly type the returned array from .map() as a [string, string] tuple
+    // to match the expected argument type for the Map constructor.
+    const officialsMap = new Map<string, string>([
+        ...league.referees.map((o): [string, string] => [o.name, o.id]),
+        ...league.tableOfficials.map((o): [string, string] => [o.name, o.id]),
+    ]);
+
     const { error: matchError } = await supabase.from('matches').update({
         home_score: match.homeScore,
         away_score: match.awayScore,
         status: match.status,
         location: match.location,
-        date: match.date,
-        referee: match.referee,
-        assistant1: match.assistant1,
-        assistant2: match.assistant2,
-        table_official: match.tableOfficial,
+        match_date: match.date,
+        referee_id: match.referee ? officialsMap.get(match.referee) : null,
+        assistant1_id: match.assistant1 ? officialsMap.get(match.assistant1) : null,
+        assistant2_id: match.assistant2 ? officialsMap.get(match.assistant2) : null,
+        table_official_id: match.tableOfficial ? officialsMap.get(match.tableOfficial) : null,
     }).eq('id', match.id);
     if (matchError) throw matchError;
 
-    // 2. Sync events (delete all, then re-insert)
     const { error: deleteError } = await supabase.from('match_events').delete().eq('match_id', match.id);
     if (deleteError) throw deleteError;
     
@@ -208,15 +275,15 @@ export const updateMatch = async (match: Match, clubs: Club[]) => {
         if (insertError) throw insertError;
     }
 
-    // 3. Recalculate goals and update players table (heavy operation)
     if (match.status === 'finished') {
-        // FIX: Add check for championship_id before proceeding with goal recalculation.
         if (!match.championship_id) {
             throw new Error("Cannot update players' stats without a championship_id on the match");
         }
-        // This is simplified. A real app might use a database function for this.
+        const championship = league.championships.find(c => c.id === match.championship_id);
+        if (!championship) throw new Error("Championship not found in league data for goal recalculation");
+
         const allPlayerGoals: { [key: string]: number } = {};
-        clubs.flatMap(c => c.players).forEach(p => allPlayerGoals[p.id] = 0);
+        championship.clubs.flatMap(c => c.players).forEach(p => allPlayerGoals[p.id] = 0);
         
         const { data: allMatchEvents, error: eventsError } = await supabase.from('match_events')
             .select('player_id, type, matches!inner(championship_id)')
@@ -231,15 +298,17 @@ export const updateMatch = async (match: Match, clubs: Club[]) => {
             }
         });
 
-        const playersToUpdate = Object.entries(allPlayerGoals).map(([id, goals]) => ({ id, goals }));
-        const { error: playerUpdateError } = await supabase.from('players').upsert(playersToUpdate);
-        if (playerUpdateError) throw playerUpdateError;
+        const playersToUpdate = Object.entries(allPlayerGoals).map(([id, goals_in_championship]) => ({ id, goals_in_championship }));
+        if (playersToUpdate.length > 0) {
+            const { error: playerUpdateError } = await supabase.from('players').upsert(playersToUpdate);
+            if (playerUpdateError) throw playerUpdateError;
+        }
     }
 };
 
 // Official Handlers
 export const createOfficial = async (leagueId: string, type: 'referees' | 'tableOfficials', official: Omit<Official, 'id'>) => {
-    await supabase.from('officials').insert({ ...official, league_id: leagueId, type: type === 'referees' ? 'referee' : 'table_official' });
+    await supabase.from('officials').insert({ ...official, league_id: leagueId, type: type === 'referees' ? 'referee' : 'table_official', bank_account: official.bankAccount });
 };
 export const updateOfficial = async (official: Official) => {
     await supabase.from('officials').update({ name: official.name, nickname: official.nickname, cpf: official.cpf, bank_account: official.bankAccount }).eq('id', official.id);
@@ -250,7 +319,7 @@ export const deleteOfficial = async (id: string) => {
 
 // Player Handlers
 export const createPlayer = async (clubId: string, player: Omit<Player, 'id'>) => {
-    await supabase.from('players').insert({ ...player, club_id: clubId, photo_url: player.photoUrl });
+    await supabase.from('players').insert({ ...player, club_id: clubId, photo_url: player.photoUrl, birth_date: player.birthDate, goals_in_championship: 0 });
 };
 export const updatePlayer = async (player: Player) => {
     await supabase.from('players').update({ name: player.name, nickname: player.nickname, position: player.position, cpf: player.cpf, photo_url: player.photoUrl }).eq('id', player.id);
@@ -268,53 +337,4 @@ export const updateStaff = async (staff: TechnicalStaff) => {
 };
 export const deleteStaff = async (id: string) => {
     await supabase.from('technical_staff').delete().eq('id', id);
-};
-
-// Financials Handlers
-export const saveFinancials = async (championshipId: string, financials: ChampionshipFinancials, clubs: Club[]) => {
-    // 1. Upsert championship financials settings
-    await supabase.from('championship_financials').upsert({
-        championship_id: championshipId,
-        referee_fee: financials.refereeFee,
-        assistant_fee: financials.assistantFee,
-        table_official_fee: financials.tableOfficialFee,
-        field_fee: financials.fieldFee,
-        yellow_card_fine: financials.yellowCardFine,
-        red_card_fine: financials.redCardFine,
-    }, { onConflict: 'championship_id' });
-    
-    // 2. Recalculate and update club financials
-     const { data: allMatchEvents, error } = await supabase.from('match_events')
-        .select('*, player:players(club_id)')
-        .in('type', ['yellow_card', 'red_card'])
-        .eq('match:matches!inner(championship_id)', championshipId);
-    
-     if (error) throw error;
-
-    const clubFines: { [clubId: string]: number } = {};
-    clubs.forEach(c => clubFines[c.id] = 0);
-
-    allMatchEvents.forEach(event => {
-        const clubId = event.player?.club_id;
-        if (clubId) {
-            const fine = event.type === 'yellow_card' ? financials.yellowCardFine : financials.redCardFine;
-            clubFines[clubId] += fine;
-        }
-    });
-
-    const clubFinancialsToUpsert = clubs.map(club => ({
-        championship_id: championshipId,
-        club_id: club.id,
-        registration_fee_due: financials.registrationFeePerClub,
-        total_fines: clubFines[club.id] || 0,
-    }));
-
-    await supabase.from('club_financials').upsert(clubFinancialsToUpsert, { onConflict: 'championship_id, club_id', ignoreDuplicates: false });
-};
-
-export const updateClubPayment = async (championshipId: string, clubId: string, amount: number) => {
-    await supabase.from('club_financials')
-        .update({ amount_paid: amount })
-        .eq('championship_id', championshipId)
-        .eq('club_id', clubId);
 };

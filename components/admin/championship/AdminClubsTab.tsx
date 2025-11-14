@@ -77,7 +77,6 @@ interface AdminClubsTabProps {
   championshipId: string;
   onCreateClub: (name: string, abbreviation: string, logoUrl: string, whatsapp: string) => void;
   onPlayerClick: (player: Player) => void;
-  onUpdateClubPayment: (clubId: string, amount: number) => void;
   // Player Props
   onUpdatePlayer: (clubId: string, updatedPlayer: Player) => void;
   onCreatePlayer: (clubId: string, name: string, position: string, nickname: string, cpf: string, photoUrl: string) => void;
@@ -156,7 +155,6 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
     championshipId,
     onCreateClub, 
     onPlayerClick,
-    onUpdateClubPayment,
     onUpdatePlayer, 
     onCreatePlayer, 
     onDeletePlayer,
@@ -169,9 +167,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
       performance: false,
       players: true,
       staff: false,
-      admin: false,
   });
-  const [paymentValue, setPaymentValue] = useState<number | string>("");
   
   // Club form state
   const [showAddClubForm, setShowAddClubForm] = useState(false);
@@ -200,9 +196,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
     const isOpeningNewClub = expandedClub !== clubId;
     setExpandedClub(prevId => (prevId === clubId ? null : clubId));
     if (isOpeningNewClub) {
-        const clubFinancials = championship.clubFinancials?.find(cf => cf.clubId === clubId);
-        setPaymentValue(clubFinancials?.amountPaid || "");
-        setOpenSections({ performance: false, players: true, staff: false, admin: false }); // Reset on opening a new club
+        setOpenSections({ performance: false, players: true, staff: false }); // Reset on opening a new club
     }
   };
 
@@ -251,13 +245,6 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
     if (!editingStaff) return;
     onUpdateStaff(clubId, editingStaff);
     setEditingStaff(null);
-  };
-
-  const handleSavePayment = (clubId: string) => {
-      const amount = parseFloat(String(paymentValue));
-      if (!isNaN(amount)) {
-          onUpdateClubPayment(clubId, amount);
-      }
   };
 
   return (
@@ -319,8 +306,6 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                 }
             }).reverse();
 
-            const clubFinancials = championship.clubFinancials?.find(cf => cf.clubId === club.id);
-
             return (
             <div key={club.id} className="bg-gray-700/50 rounded-lg overflow-hidden">
               <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-700" onClick={() => toggleClub(club.id)}>
@@ -365,48 +350,6 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                         </div>
                     </div>
                   </CollapsibleSection>
-
-                   <CollapsibleSection title="Financeiro & Administrativo" isOpen={openSections.admin} onToggle={() => toggleSection('admin')}>
-                        {clubFinancials ? (
-                             <div className="space-y-3 text-sm">
-                                <div className="flex justify-between p-2 bg-gray-700/50 rounded">
-                                    <span className="text-gray-400">Taxa de Inscrição:</span>
-                                    <span className="font-bold text-white">{clubFinancials.registrationFeeDue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                </div>
-                                <div className="flex justify-between p-2 bg-gray-700/50 rounded">
-                                    <span className="text-gray-400">Total em Multas (Cartões):</span>
-                                    <span className="font-bold text-white">{clubFinancials.totalFines.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                </div>
-                                 <div className="flex justify-between p-2 bg-gray-700/50 rounded items-center">
-                                    <span className="text-gray-400">Valor Pago:</span>
-                                    <div className="flex items-center gap-2">
-                                        <div className="relative">
-                                            <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-gray-400 text-xs">R$</span>
-                                            <input 
-                                                type="number" 
-                                                value={paymentValue}
-                                                onChange={(e) => setPaymentValue(e.target.value)}
-                                                onBlur={() => handleSavePayment(club.id)}
-                                                className="bg-gray-800 border-gray-600 rounded p-1 pl-7 text-white w-28 text-right"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className={`flex justify-between p-3 rounded mt-2 ${clubFinancials.balance > 0 ? 'bg-red-500/20' : 'bg-green-500/20'}`}>
-                                    <span className={`font-bold ${clubFinancials.balance > 0 ? 'text-red-300' : 'text-green-300'}`}>
-                                      {clubFinancials.balance > 0 ? 'Saldo Devedor:' : 'Crédito:'}
-                                    </span>
-                                    <span className={`font-bold text-xl ${clubFinancials.balance > 0 ? 'text-red-300' : 'text-green-300'}`}>
-                                        {Math.abs(clubFinancials.balance).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                    </span>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="text-center text-gray-500 text-sm py-3">
-                                As informações financeiras ainda não foram configuradas para este campeonato.
-                            </div>
-                        )}
-                   </CollapsibleSection>
 
                   {/* Players Section */}
                   <CollapsibleSection title="Jogadores" isOpen={openSections.players} onToggle={() => toggleSection('players')}>
