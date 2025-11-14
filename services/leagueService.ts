@@ -37,10 +37,9 @@ const transformLeagues = (data: any[]): League[] => {
                 
                 const getTeamObject = (teamId: string, teamData?: Club): Club => {
                     if (teamData) return teamData;
-                    if (teamId.startsWith('ph-')) {
-                        return { id: teamId, name: teamId.substring(3).replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), abbreviation: 'TBD', logoUrl: '', players: [], technicalStaff: [] };
-                    }
-                    return { id: teamId, name: 'Desconhecido', abbreviation: '???', logoUrl: '', players: [], technicalStaff: [] };
+                    // This handles placeholder teams that might not be in the clubMap yet
+                    const placeholderName = teamId.startsWith('ph-') ? teamId.substring(3).replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Desconhecido';
+                    return { id: teamId, name: placeholderName, abbreviation: 'TBD', logoUrl: '', players: [], technicalStaff: [] };
                 };
 
                 return {
@@ -261,6 +260,8 @@ export const updateMatch = async (match: Match, league: League) => {
         assistant1_id: match.assistant1 ? officialsMap.get(match.assistant1) : null,
         assistant2_id: match.assistant2 ? officialsMap.get(match.assistant2) : null,
         table_official_id: match.tableOfficial ? officialsMap.get(match.tableOfficial) : null,
+        home_team_id: match.homeTeam.id,
+        away_team_id: match.awayTeam.id,
     }).eq('id', match.id);
     if (matchError) throw matchError;
 
@@ -364,7 +365,7 @@ export const createOrGetPlaceholderClub = async (clubName: string): Promise<Club
     }
 
     const newPlaceholderClub = {
-        id: crypto.randomUUID(),
+        id: `ph-${clubName.toLowerCase().replace(/\s/g, '-')}`, // Use a deterministic ID for placeholders
         name: clubName,
         abbreviation: 'TBD',
         logo_url: ''

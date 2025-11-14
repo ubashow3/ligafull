@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Match, League } from '../../types';
+import React, { useState, useMemo } from 'react';
+import { Match, League, Club } from '../../types';
 
 interface EditGameDetailsModalProps {
   isOpen: boolean;
@@ -7,9 +7,10 @@ interface EditGameDetailsModalProps {
   match: Match;
   league: League;
   onSave: (updatedMatch: Match) => void;
+  championshipClubs: Club[];
 }
 
-const EditGameDetailsModal: React.FC<EditGameDetailsModalProps> = ({ isOpen, onClose, match, league, onSave }) => {
+const EditGameDetailsModal: React.FC<EditGameDetailsModalProps> = ({ isOpen, onClose, match, league, onSave, championshipClubs }) => {
   const [details, setDetails] = useState({
     location: match.location,
     date: match.date.split('T')[0],
@@ -18,7 +19,13 @@ const EditGameDetailsModal: React.FC<EditGameDetailsModalProps> = ({ isOpen, onC
     assistant1: match.assistant1 || '',
     assistant2: match.assistant2 || '',
     tableOfficial: match.tableOfficial || '',
+    homeTeamId: match.homeTeam.id,
+    awayTeamId: match.awayTeam.id,
   });
+
+  const isPlayoffMatch = useMemo(() => match.homeTeam.abbreviation === 'TBD' || match.awayTeam.abbreviation === 'TBD', [match]);
+  
+  const realClubs = useMemo(() => championshipClubs.filter(c => c.abbreviation !== 'TBD'), [championshipClubs]);
 
   if (!isOpen) return null;
 
@@ -28,8 +35,13 @@ const EditGameDetailsModal: React.FC<EditGameDetailsModalProps> = ({ isOpen, onC
   };
 
   const handleSave = () => {
+    const homeTeam = championshipClubs.find(c => c.id === details.homeTeamId) || match.homeTeam;
+    const awayTeam = championshipClubs.find(c => c.id === details.awayTeamId) || match.awayTeam;
+
     const updatedMatch: Match = {
       ...match,
+      homeTeam,
+      awayTeam,
       location: details.location,
       date: `${details.date}T${details.time}:00`,
       referee: details.referee,
@@ -56,6 +68,27 @@ const EditGameDetailsModal: React.FC<EditGameDetailsModalProps> = ({ isOpen, onC
         </div>
 
         <div className="space-y-4">
+            {isPlayoffMatch && (
+              <div className="bg-gray-700/50 p-4 rounded-lg">
+                <h3 className="text-md font-semibold text-green-400 mb-2">Definir Times do Mata-Mata</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300">{match.homeTeam.name}</label>
+                    <select name="homeTeamId" value={details.homeTeamId} onChange={handleChange} className="mt-1 w-full bg-gray-700 border border-gray-600 rounded p-2 text-white">
+                        <option value={match.homeTeam.id} disabled>{match.homeTeam.name}</option>
+                        {realClubs.map(club => <option key={club.id} value={club.id} disabled={club.id === details.awayTeamId}>{club.name}</option>)}
+                    </select>
+                  </div>
+                   <div>
+                    <label className="block text-sm font-medium text-gray-300">{match.awayTeam.name}</label>
+                    <select name="awayTeamId" value={details.awayTeamId} onChange={handleChange} className="mt-1 w-full bg-gray-700 border border-gray-600 rounded p-2 text-white">
+                        <option value={match.awayTeam.id} disabled>{match.awayTeam.name}</option>
+                        {realClubs.map(club => <option key={club.id} value={club.id} disabled={club.id === details.homeTeamId}>{club.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
             <div>
                 <label className="block text-sm font-medium text-gray-300">Local</label>
                 <input type="text" name="location" value={details.location} onChange={handleChange} className="mt-1 w-full bg-gray-700 border border-gray-600 rounded p-2 text-white"/>
