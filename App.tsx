@@ -311,14 +311,152 @@ const App: React.FC = () => {
   };
   
   const handleGenerateMatches = async (config: ChampionshipWizardConfig) => {
-    // Note: The actual logic for generating match pairings based on config (e.g., round-robin algorithm)
-    // is complex and should be implemented here or in a helper function.
-    // For now, this is a placeholder.
-    alert('Funcionalidade de geração de partidas ainda não implementada.');
-    console.log('Generating matches with config:', config);
-    // 1. Call a function: const generatedMatches = generatePairings(championship.clubs, config);
-    // 2. await leagueService.generateMatches(championshipId, generatedMatches);
-    // 3. await fetchData();
+    if (view.name !== 'admin_championship' && view.name !== 'create_matches') return;
+    
+    const league = processedLeagues.find(l => l.id === view.leagueId);
+    const championship = league?.championships.find(c => c.id === view.championshipId);
+
+    if (!championship || championship.clubs.length < 2) {
+      alert('É necessário ter pelo menos 2 clubes no campeonato para gerar os jogos.');
+      return;
+    }
+    
+    setIsLoading(true);
+
+    try {
+      // 1. Create a mutable copy of clubs and handle odd numbers with a bye
+      let clubs = [...championship.clubs];
+      const byeClub: Club = { id: 'bye', name: 'BYE', abbreviation: 'BYE', logoUrl: '', players: [], technicalStaff: [] };
+      if (clubs.length % 2 !== 0) {
+        clubs.push(byeClub);
+      }
+      
+      const generatedMatches: Match[] = [];
+      const numTeams = clubs.length;
+      const numRounds = numTeams - 1;
+      const matchesPerRound = numTeams / 2;
+      const startDate = new Date();
+
+      // 2. Generate Round Robin pairings for the first turn
+      for (let round = 0; round < numRounds; round++) {
+        for (let i = 0; i < matchesPerRound; i++) {
+          const home = clubs[i];
+          const away = clubs[numTeams - 1 - i];
+
+          // Don't create a match for a "bye" team
+          if (home.id !== 'bye' && away.id !== 'bye') {
+            const matchDate = new Date(startDate);
+            matchDate.setDate(startDate.getDate() + (round * 7)); // Simple weekly rounds
+            matchDate.setHours(16, 0, 0, 0);
+
+            generatedMatches.push({
+              id: crypto.randomUUID(),
+              round: round + 1,
+              homeTeam: home,
+              awayTeam: away,
+              homeScore: null,
+              awayScore: null,
+              date: matchDate.toISOString(),
+              status: 'scheduled',
+              location: 'A definir',
+              events: [],
+              championship_id: championship.id,
+            });
+          }
+        }
+        // Rotate teams for the next round, keeping the first team fixed
+        const lastTeam = clubs.pop()!;
+        clubs.splice(1, 0, lastTeam);
+      }
+
+      // 3. Handle second turn (return matches) if configured
+      if (config.turns === 2) {
+        const returnMatches = generatedMatches.map(match => {
+           const returnDate = new Date(match.date);
+           returnDate.setDate(returnDate.getDate() + (numRounds + 1) * 7); // Offset for the second half
+           return {
+              ...match,
+              id: crypto.randomUUID(),
+              round: match.round + numRounds,
+              homeTeam: match.awayTeam,
+              awayTeam: match.homeTeam,
+              date: returnDate.toISOString(),
+           }
+        });
+        generatedMatches.push(...returnMatches);
+      }
+      
+      // 4. Handle Playoffs (Mata-Mata)
+      if (config.playoffs) {
+          const totalQualifiers = config.format === 'ROUND_ROBIN' 
+              ? config.playoffTeamsPerGroup 
+              : config.numGroups * config.playoffTeamsPerGroup;
+          
+          let lastRound = generatedMatches.reduce((max, m) => Math.max(max, m.round), 0);
+          
+          // Helper to create placeholder teams for playoffs
+          const createPlaceholderTeam = (name: string): Club => ({
+              id: `ph-${name.toLowerCase().replace(/\s/g, '-')}`,
+              name: name,
+              abbreviation: 'TBD',
+              logoUrl: '',
+              players: [],
+              technicalStaff: []
+          });
+
+          // FIX: Add explicit return type 'Match' to ensure the 'status' property
+          // is correctly typed as a literal and not widened to 'string'.
+          const createPlayoffMatch = (round: number, homePlaceholder: string, awayPlaceholder: string): Match => {
+              const matchDate = new Date();
+              matchDate.setDate(new Date().getDate() + (round * 7));
+              matchDate.setHours(16, 0, 0, 0);
+              return {
+                  id: crypto.randomUUID(),
+                  round: round,
+                  homeTeam: createPlaceholderTeam(homePlaceholder),
+                  awayTeam: createPlaceholderTeam(awayPlaceholder),
+                  homeScore: null,
+                  awayScore: null,
+                  date: matchDate.toISOString(),
+                  status: 'scheduled',
+                  location: 'A definir',
+                  events: [],
+                  championship_id: championship.id
+              };
+          };
+
+          if (totalQualifiers >= 8) { // Quarter-finals
+              lastRound++;
+              generatedMatches.push(createPlayoffMatch(lastRound, '1º Colocado', '8º Colocado'));
+              generatedMatches.push(createPlayoffMatch(lastRound, '2º Colocado', '7º Colocado'));
+              generatedMatches.push(createPlayoffMatch(lastRound, '3º Colocado', '6º Colocado'));
+              generatedMatches.push(createPlayoffMatch(lastRound, '4º Colocado', '5º Colocado'));
+          }
+          if (totalQualifiers >= 4) { // Semi-finals
+              lastRound++;
+              const qfPrefix = totalQualifiers >= 8 ? "QF" : "Colocado";
+              generatedMatches.push(createPlayoffMatch(lastRound, `Vencedor ${qfPrefix} 1`, `Vencedor ${qfPrefix} 4`));
+              generatedMatches.push(createPlayoffMatch(lastRound, `Vencedor ${qfPrefix} 2`, `Vencedor ${qfPrefix} 3`));
+          }
+          if (totalQualifiers >= 2) { // Final
+              lastRound++;
+              generatedMatches.push(createPlayoffMatch(lastRound, 'Vencedor SF 1', 'Vencedor SF 2'));
+          }
+      }
+
+      // 5. Call the service to save the matches
+      await leagueService.generateMatches(championship.id, generatedMatches);
+      
+      // 6. Refresh data and navigate back
+      await fetchData();
+      setView({ name: 'admin_championship', leagueId: view.leagueId, championshipId: championship.id });
+
+    } catch (error) {
+      console.error("Failed to generate matches:", error);
+      alert(`Erro ao gerar partidas: ${(error as Error).message}`);
+    } finally {
+        setIsLoading(false);
+    }
   };
 
 
