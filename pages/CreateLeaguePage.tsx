@@ -1,5 +1,7 @@
 
+
 import React, { useState, useEffect } from 'react';
+import * as leagueService from '../services/leagueService';
 
 interface IBGEState {
   id: number;
@@ -20,13 +22,14 @@ interface CreateLeaguePageProps {
 
 const CreateLeaguePage: React.FC<CreateLeaguePageProps> = ({ onBack, onCreateLeague, isLoading }) => {
   const [name, setName] = useState('');
-  const [logoUrl, setLogoUrl] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [states, setStates] = useState<IBGEState[]>([]);
   const [cities, setCities] = useState<IBGECity[]>([]);
   const [selectedState, setSelectedState] = useState('');
   const [selectedCity, setSelectedCity] = useState('');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string>('');
 
   useEffect(() => {
     fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome')
@@ -45,7 +48,22 @@ const CreateLeaguePage: React.FC<CreateLeaguePageProps> = ({ onBack, onCreateLea
     setSelectedCity('');
   }, [selectedState]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+        const file = e.target.files[0];
+        setLogoFile(file);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setLogoPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+    } else {
+        setLogoFile(null);
+        setLogoPreview('');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
 
@@ -53,7 +71,18 @@ const CreateLeaguePage: React.FC<CreateLeaguePageProps> = ({ onBack, onCreateLea
       alert('Todos os campos, exceto o logo, são obrigatórios.');
       return;
     }
-    onCreateLeague(name.trim(), logoUrl.trim(), email.trim(), password.trim(), selectedState, selectedCity);
+    
+    let uploadedLogoUrl = '';
+    if (logoFile) {
+        try {
+            uploadedLogoUrl = await leagueService.uploadImage(logoFile);
+        } catch (error) {
+            alert(`Erro ao fazer upload do logo: ${(error as Error).message}`);
+            return; 
+        }
+    }
+
+    onCreateLeague(name.trim(), uploadedLogoUrl, email.trim(), password.trim(), selectedState, selectedCity);
   };
 
   return (
@@ -105,11 +134,28 @@ const CreateLeaguePage: React.FC<CreateLeaguePageProps> = ({ onBack, onCreateLea
                 <label htmlFor="league-password" className="block text-sm font-medium text-gray-300">Senha do Administrador</label>
                 <input type="password" name="league-password" id="league-password" value={password} onChange={(e) => setPassword(e.target.value)} required className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50" />
             </div>
-
+            
             <div>
-                <label htmlFor="league-logo" className="block text-sm font-medium text-gray-300">Logo da Liga (URL)</label>
-                <input type="text" name="league-logo" id="league-logo" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50" placeholder="https://exemplo.com/logo.png" />
+                <label htmlFor="league-logo-file" className="block text-sm font-medium text-gray-300">Logo da Liga</label>
+                <div className="mt-1 flex items-center gap-4">
+                    {logoPreview ? (
+                        <img src={logoPreview} alt="Prévia do logo" className="w-16 h-16 rounded-full object-cover" />
+                    ) : (
+                        <div className="w-16 h-16 rounded-full bg-gray-700 flex items-center justify-center text-gray-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        </div>
+                    )}
+                    <input 
+                        type="file" 
+                        name="league-logo-file" 
+                        id="league-logo-file" 
+                        onChange={handleFileChange} 
+                        accept="image/png, image/jpeg, image/webp"
+                        className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-600/20 file:text-green-300 hover:file:bg-green-600/30 disabled:opacity-50"
+                    />
+                </div>
             </div>
+
           </fieldset>
             <div className="flex justify-end gap-4 pt-4">
               <button type="button" onClick={onBack} disabled={isLoading} className="py-2 px-4 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 disabled:opacity-50">

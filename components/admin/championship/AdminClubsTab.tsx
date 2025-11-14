@@ -1,5 +1,8 @@
+
+
 import React, { useState } from 'react';
 import { Club, Player, TechnicalStaff, Championship, Match } from '../../../types';
+import * as leagueService from '../../../services/leagueService';
 
 const maskCPF = (value: string) => {
   if (!value) return "";
@@ -173,8 +176,9 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
   const [showAddClubForm, setShowAddClubForm] = useState(false);
   const [newClubName, setNewClubName] = useState('');
   const [newClubAbbr, setNewClubAbbr] = useState('');
-  const [newClubLogo, setNewClubLogo] = useState('');
   const [newClubWhatsapp, setNewClubWhatsapp] = useState('');
+  const [newClubLogoFile, setNewClubLogoFile] = useState<File | null>(null);
+  const [newClubLogoPreview, setNewClubLogoPreview] = useState<string>('');
   
   // Player form state
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
@@ -183,7 +187,12 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
   const [newPlayerPosition, setNewPlayerPosition] = useState('');
   const [newPlayerNickname, setNewPlayerNickname] = useState('');
   const [newPlayerCpf, setNewPlayerCpf] = useState('');
-  const [newPlayerPhotoUrl, setNewPlayerPhotoUrl] = useState('');
+  const [newPlayerPhotoFile, setNewPlayerPhotoFile] = useState<File | null>(null);
+  const [newPlayerPhotoPreview, setNewPlayerPhotoPreview] = useState<string>('');
+
+  // Player edit state
+  const [editingPlayerPhotoFile, setEditingPlayerPhotoFile] = useState<File | null>(null);
+  const [editingPlayerPhotoPreview, setEditingPlayerPhotoPreview] = useState<string>('');
 
   // Staff form state
   const [editingStaff, setEditingStaff] = useState<TechnicalStaff | null>(null);
@@ -196,7 +205,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
     const isOpeningNewClub = expandedClub !== clubId;
     setExpandedClub(prevId => (prevId === clubId ? null : clubId));
     if (isOpeningNewClub) {
-        setOpenSections({ performance: false, players: true, staff: false }); // Reset on opening a new club
+        setOpenSections({ performance: false, players: true, staff: false });
     }
   };
 
@@ -204,32 +213,85 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
       setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
-  const handleAddClub = (e: React.FormEvent) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<File | null>>, previewSetter: React.Dispatch<React.SetStateAction<string>>) => {
+    if (e.target.files && e.target.files[0]) {
+        const file = e.target.files[0];
+        setter(file);
+        previewSetter(URL.createObjectURL(file));
+    } else {
+        setter(null);
+        previewSetter('');
+    }
+  };
+
+  const handleAddClub = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newClubName.trim() || !newClubAbbr.trim()) return;
+    
+    let uploadedLogoUrl = '';
+    if (newClubLogoFile) {
+        try {
+            uploadedLogoUrl = await leagueService.uploadImage(newClubLogoFile);
+        } catch (error) {
+            alert(`Erro no upload do logo: ${(error as Error).message}`);
+            return;
+        }
+    }
+
     const cleanWhatsapp = '+55' + newClubWhatsapp.replace(/\D/g, '');
-    onCreateClub(newClubName.trim(), newClubAbbr.trim().toUpperCase(), newClubLogo.trim(), cleanWhatsapp);
-    setNewClubName(''); setNewClubAbbr(''); setNewClubLogo(''); setNewClubWhatsapp('');
+    onCreateClub(newClubName.trim(), newClubAbbr.trim().toUpperCase(), uploadedLogoUrl, cleanWhatsapp);
+    
+    setNewClubName(''); setNewClubAbbr(''); setNewClubWhatsapp('');
+    setNewClubLogoFile(null); setNewClubLogoPreview('');
     setShowAddClubForm(false);
   };
 
   // Player Handlers
-  const handleAddPlayer = (e: React.FormEvent, clubId: string) => {
+  const handleAddPlayer = async (e: React.FormEvent, clubId: string) => {
     e.preventDefault();
     if (!newPlayerName.trim() || !newPlayerPosition.trim()) return;
-    onCreatePlayer(clubId, newPlayerName.trim(), newPlayerPosition.trim(), newPlayerNickname.trim(), newPlayerCpf.trim(), newPlayerPhotoUrl.trim());
-    setNewPlayerName(''); setNewPlayerPosition(''); setNewPlayerNickname(''); setNewPlayerCpf(''); setNewPlayerPhotoUrl('');
+
+    let uploadedPhotoUrl = '';
+    if (newPlayerPhotoFile) {
+        try {
+            uploadedPhotoUrl = await leagueService.uploadImage(newPlayerPhotoFile);
+        } catch (error) {
+            alert(`Erro no upload da foto: ${(error as Error).message}`);
+            return;
+        }
+    }
+
+    onCreatePlayer(clubId, newPlayerName.trim(), newPlayerPosition.trim(), newPlayerNickname.trim(), newPlayerCpf.trim(), uploadedPhotoUrl);
+    setNewPlayerName(''); setNewPlayerPosition(''); setNewPlayerNickname(''); setNewPlayerCpf('');
+    setNewPlayerPhotoFile(null); setNewPlayerPhotoPreview('');
     setShowAddPlayerFormForClub(null);
   };
 
   const handleEditPlayer = (player: Player) => {
     setEditingPlayer(JSON.parse(JSON.stringify(player)));
+    setEditingPlayerPhotoFile(null); 
+    setEditingPlayerPhotoPreview(''); 
   };
   
-  const handleSavePlayer = (clubId: string) => {
+  const handleSavePlayer = async (clubId: string) => {
     if (!editingPlayer) return;
-    onUpdatePlayer(clubId, editingPlayer);
+    
+    let playerToSave = { ...editingPlayer };
+
+    if (editingPlayerPhotoFile) {
+        try {
+            const uploadedPhotoUrl = await leagueService.uploadImage(editingPlayerPhotoFile);
+            playerToSave.photoUrl = uploadedPhotoUrl;
+        } catch (error) {
+            alert(`Erro ao fazer upload da foto: ${(error as Error).message}`);
+            return;
+        }
+    }
+    
+    onUpdatePlayer(clubId, playerToSave);
     setEditingPlayer(null);
+    setEditingPlayerPhotoFile(null);
+    setEditingPlayerPhotoPreview('');
   };
 
   // Staff Handlers
@@ -261,7 +323,10 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
         <form onSubmit={handleAddClub} className="bg-gray-700/50 p-4 rounded-lg mb-6 space-y-3 animate-fade-in-down">
           <input type="text" value={newClubName} onChange={(e) => setNewClubName(e.target.value)} placeholder="Nome do Clube" required className="w-full bg-gray-800 border-gray-600 rounded p-2 text-white"/>
           <input type="text" value={newClubAbbr} onChange={(e) => setNewClubAbbr(e.target.value)} placeholder="Abreviação (3 letras)" maxLength={3} required className="w-full bg-gray-800 border-gray-600 rounded p-2 text-white"/>
-          <input type="text" value={newClubLogo} onChange={(e) => setNewClubLogo(e.target.value)} placeholder="URL do Logo (Opcional)" className="w-full bg-gray-800 border-gray-600 rounded p-2 text-white"/>
+           <div className="flex items-center gap-4">
+                {newClubLogoPreview ? <img src={newClubLogoPreview} alt="Prévia" className="w-12 h-12 rounded-full object-cover"/> : <div className="w-12 h-12 rounded-full bg-gray-600"/>}
+                <input type="file" onChange={(e) => handleFileChange(e, setNewClubLogoFile, setNewClubLogoPreview)} accept="image/*" className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-600/20 file:text-green-300 hover:file:bg-green-600/30"/>
+           </div>
           <div className="relative">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 pointer-events-none">+55</span>
             <input 
@@ -365,7 +430,10 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                              <input type="text" value={newPlayerNickname} onChange={e => setNewPlayerNickname(e.target.value)} placeholder="Apelido" className="bg-gray-900 p-1 rounded w-full text-sm"/>
                              <input type="text" value={newPlayerCpf} onChange={e => setNewPlayerCpf(maskCPF(e.target.value))} placeholder="CPF" className="bg-gray-900 p-1 rounded w-full text-sm"/>
                           </div>
-                           <input type="text" value={newPlayerPhotoUrl} onChange={e => setNewPlayerPhotoUrl(e.target.value)} placeholder="URL da Foto" className="bg-gray-900 p-1 rounded w-full text-sm"/>
+                           <div className="flex items-center gap-4">
+                                {newPlayerPhotoPreview ? <img src={newPlayerPhotoPreview} alt="Prévia" className="w-10 h-10 rounded-full object-cover"/> : <div className="w-10 h-10 rounded-full bg-gray-600"/>}
+                                <input type="file" onChange={(e) => handleFileChange(e, setNewPlayerPhotoFile, setNewPlayerPhotoPreview)} accept="image/*" className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-600/20 file:text-green-300 hover:file:bg-green-600/30"/>
+                           </div>
                           <select value={newPlayerPosition} onChange={e => setNewPlayerPosition(e.target.value)} required className="bg-gray-900 p-1 rounded w-full text-sm">
                               <option value="" disabled>Posição</option>
                               {positions.map(pos => <option key={pos} value={pos}>{pos}</option>)}
@@ -385,7 +453,10 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                                       <input value={editingPlayer.nickname || ''} onChange={e => setEditingPlayer({...editingPlayer, nickname: e.target.value})} className="bg-gray-700 p-1 rounded text-sm w-full" placeholder="Apelido"/>
                                       <input value={editingPlayer.cpf || ''} onChange={e => setEditingPlayer({...editingPlayer, cpf: maskCPF(e.target.value)})} className="bg-gray-700 p-1 rounded text-sm w-full" placeholder="CPF"/>
                                     </div>
-                                    <input value={editingPlayer.photoUrl || ''} onChange={e => setEditingPlayer({...editingPlayer, photoUrl: e.target.value})} className="bg-gray-700 p-1 rounded text-sm" placeholder="URL da Foto"/>
+                                    <div className="flex items-center gap-4">
+                                        <img src={editingPlayerPhotoPreview || editingPlayer.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt="Prévia" className="w-10 h-10 rounded-full object-cover"/>
+                                        <input type="file" onChange={(e) => handleFileChange(e, setEditingPlayerPhotoFile, setEditingPlayerPhotoPreview)} accept="image/*" className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-600/20 file:text-green-300 hover:file:bg-green-600/30"/>
+                                   </div>
                                     <select value={editingPlayer.position} onChange={e => setEditingPlayer({...editingPlayer, position: e.target.value})} className="bg-gray-700 p-1 rounded text-sm">
                                         {positions.map(pos => <option key={pos} value={pos}>{pos}</option>)}
                                     </select>

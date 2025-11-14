@@ -8,6 +8,34 @@ const generateSlug = (name: string) => {
   return name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
 };
 
+// Nova função para upload de imagem
+export const uploadImage = async (file: File): Promise<string> => {
+    if (!file) return '';
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${crypto.randomUUID()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(filePath, file);
+
+    if (uploadError) {
+        console.error('Error uploading image:', uploadError);
+        throw new Error(`Falha no upload da imagem: ${uploadError.message}`);
+    }
+
+    const { data } = supabase.storage
+        .from('images')
+        .getPublicUrl(filePath);
+
+    if (!data?.publicUrl) {
+        throw new Error('Não foi possível obter a URL pública da imagem.');
+    }
+
+    return data.publicUrl;
+};
+
 // Helper to transform Supabase data into the nested structure the app expects
 const transformLeagues = (data: any[]): League[] => {
     if (!data) return [];
@@ -187,7 +215,7 @@ export const createLeague = async (leagueData: { name: string, logoUrl: string, 
         id: crypto.randomUUID(),
         name,
         slug: generateSlug(name),
-        logo_url: logoUrl || `https://picsum.photos/seed/${Date.now()}/200/200`,
+        logo_url: logoUrl,
         admin_email: adminEmail,
         admin_password_hash: adminPassword,
         state,
@@ -241,7 +269,7 @@ export const addClubToChampionship = async (championshipId: string, clubData: { 
         id: crypto.randomUUID(),
         name: clubData.name,
         abbreviation: clubData.abbreviation,
-        logo_url: clubData.logoUrl || `https://picsum.photos/seed/${Date.now()}/100/100`,
+        logo_url: clubData.logoUrl,
         whatsapp: clubData.whatsapp,
     }).select().single();
     if (clubError) throw clubError;
