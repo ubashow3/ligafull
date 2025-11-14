@@ -30,7 +30,7 @@ const calculateStandings = (clubs: Club[], matches: Match[]): Standing[] => {
         });
     });
 
-    matches.filter(m => m.status === 'finished' && m.homeScore != null && m.awayScore != null).forEach(match => {
+    matches.filter(m => (m.status === 'finished' || m.status === 'in_progress') && m.homeScore != null && m.awayScore != null).forEach(match => {
         const homeTeamId = typeof match.homeTeam === 'object' ? match.homeTeam.id : match.homeTeam;
         const awayTeamId = typeof match.awayTeam === 'object' ? match.awayTeam.id : match.awayTeam;
 

@@ -23,7 +23,7 @@ const EditGameDetailsModal: React.FC<EditGameDetailsModalProps> = ({ isOpen, onC
     awayTeamId: match.awayTeam.id,
   });
 
-  const isPlayoffMatch = useMemo(() => match.homeTeam.id.startsWith('ph-') || match.awayTeam.id.startsWith('ph-'), [match]);
+  const isPlayoffMatch = useMemo(() => match.homeTeam.abbreviation === 'TBD' || match.awayTeam.abbreviation === 'TBD', [match]);
   
   const realClubs = useMemo(() => championshipClubs.filter(c => !c.id.startsWith('ph-')), [championshipClubs]);
 

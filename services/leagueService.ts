@@ -243,8 +243,6 @@ export const generateMatches = async (championshipId: string, matches: Match[]) 
 };
 
 export const updateMatch = async (match: Match, league: League) => {
-    // FIX: Explicitly type the returned array from .map() as a [string, string] tuple
-    // to match the expected argument type for the Map constructor.
     const officialsMap = new Map<string, string>([
         ...league.referees.map((o): [string, string] => [o.name, o.id]),
         ...league.tableOfficials.map((o): [string, string] => [o.name, o.id]),
@@ -279,77 +277,154 @@ export const updateMatch = async (match: Match, league: League) => {
         if (insertError) throw insertError;
     }
 
-    if (match.status === 'finished') {
-        if (!match.championship_id) {
-            throw new Error("Cannot update players' stats without a championship_id on the match");
+    // Recalculate top scorers every time the summary is saved (draft or final)
+    const championshipId = match.championship_id;
+    if (!championshipId) {
+        console.warn("Could not update player goals: Championship ID not found in match object.");
+        return;
+    }
+
+    const { data: championshipClubs, error: clubsError } = await supabase
+        .from('championship_clubs')
+        .select('club_id')
+        .eq('championship_id', championshipId);
+    if (clubsError) throw clubsError;
+    
+    const clubIds = (championshipClubs || []).map(cc => cc.club_id);
+    if (clubIds.length === 0) return; // No clubs in championship, nothing to update
+
+    const { data: playersInChampionship, error: playersError } = await supabase
+        .from('players')
+        .select('id')
+        .in('club_id', clubIds);
+    if (playersError) throw playersError;
+
+    const allPlayerGoals: { [key: string]: number } = {};
+    (playersInChampionship || []).forEach(p => { allPlayerGoals[p.id] = 0; });
+
+    const { data: allMatchEvents, error: eventsError } = await supabase
+        .from('match_events')
+        .select('player_id, matches!inner(championship_id)')
+        .eq('matches.championship_id', championshipId)
+        .eq('type', 'goal');
+    if (eventsError) throw eventsError;
+
+    (allMatchEvents || []).forEach(event => {
+        if (event.player_id && allPlayerGoals.hasOwnProperty(event.player_id)) {
+            allPlayerGoals[event.player_id]++;
         }
-        const championship = league.championships.find(c => c.id === match.championship_id);
-        if (!championship) throw new Error("Championship not found in league data for goal recalculation");
-
-        const allPlayerGoals: { [key: string]: number } = {};
-        championship.clubs.flatMap(c => c.players).forEach(p => allPlayerGoals[p.id] = 0);
-        
-        const { data: allMatchEvents, error: eventsError } = await supabase.from('match_events')
-            .select('player_id, type, matches!inner(championship_id)')
-            .eq('matches.championship_id', match.championship_id)
-            .eq('type', 'goal');
-
-        if (eventsError) throw eventsError;
-
-        (allMatchEvents || []).forEach(event => {
-            if (event.player_id) {
-                 allPlayerGoals[event.player_id] = (allPlayerGoals[event.player_id] || 0) + 1;
-            }
-        });
-
-        const playersToUpdate = Object.entries(allPlayerGoals).map(([id, goals_in_championship]) => ({ id, goals_in_championship }));
-        if (playersToUpdate.length > 0) {
-            const { error: playerUpdateError } = await supabase.from('players').upsert(playersToUpdate);
-            if (playerUpdateError) throw playerUpdateError;
-        }
+    });
+    
+    const playersToUpdate = Object.entries(allPlayerGoals).map(([id, goals_in_championship]) => ({ id, goals_in_championship }));
+    if (playersToUpdate.length > 0) {
+        const { error: playerUpdateError } = await supabase.from('players').upsert(playersToUpdate, { onConflict: 'id' });
+        if (playerUpdateError) throw playerUpdateError;
     }
 };
 
 // Official Handlers
 export const createOfficial = async (leagueId: string, type: 'referees' | 'tableOfficials', official: Omit<Official, 'id'>) => {
-    const { error } = await supabase.from('officials').insert({ id: crypto.randomUUID(), ...official, league_id: leagueId, type: type === 'referees' ? 'referee' : 'table_official', bank_account: official.bankAccount });
-    if (error) throw error;
+    const { name, nickname, cpf, bankAccount } = official;
+    const { error } = await supabase.from('officials').insert({
+        id: crypto.randomUUID(),
+        league_id: leagueId,
+        name,
+        nickname,
+        cpf,
+        bank_account: bankAccount,
+        type: type === 'referees' ? 'referee' : 'table_official',
+    });
+    if (error) {
+        console.error("Supabase createOfficial error:", error);
+        throw new Error(`Falha ao criar oficial: ${error.message}`);
+    }
 };
 export const updateOfficial = async (official: Official) => {
-    const { error } = await supabase.from('officials').update({ name: official.name, nickname: official.nickname, cpf: official.cpf, bank_account: official.bankAccount }).eq('id', official.id);
-    if (error) throw error;
+    const { id, name, nickname, cpf, bankAccount } = official;
+    const { error } = await supabase.from('officials').update({ name, nickname, cpf, bank_account: bankAccount }).eq('id', id);
+    if (error) {
+        console.error("Supabase updateOfficial error:", error);
+        throw new Error(`Falha ao atualizar oficial: ${error.message}`);
+    }
 };
 export const deleteOfficial = async (id: string) => {
     const { error } = await supabase.from('officials').delete().eq('id', id);
-    if (error) throw error;
+    if (error) {
+        console.error("Supabase deleteOfficial error:", error);
+        throw new Error(`Falha ao deletar oficial: ${error.message}`);
+    }
 };
 
 // Player Handlers
 export const createPlayer = async (clubId: string, player: Omit<Player, 'id'>) => {
-    const { error } = await supabase.from('players').insert({ id: crypto.randomUUID(), ...player, club_id: clubId, photo_url: player.photoUrl, birth_date: player.birthDate, goals_in_championship: 0 });
-    if (error) throw error;
+    const { name, position, nickname, cpf, photoUrl, birthDate, goals } = player;
+    const { error } = await supabase.from('players').insert({
+        id: crypto.randomUUID(),
+        club_id: clubId,
+        name,
+        position,
+        nickname,
+        cpf,
+        photo_url: photoUrl,
+        birth_date: birthDate,
+        goals_in_championship: goals,
+    });
+    if (error) {
+        console.error("Supabase createPlayer error:", error);
+        throw new Error(`Falha ao criar jogador: ${error.message}`);
+    }
 };
 export const updatePlayer = async (player: Player) => {
-    const { error } = await supabase.from('players').update({ name: player.name, nickname: player.nickname, position: player.position, cpf: player.cpf, photo_url: player.photoUrl }).eq('id', player.id);
-    if (error) throw error;
+    const { id, name, nickname, position, cpf, photoUrl, birthDate } = player;
+    const { error } = await supabase.from('players').update({ 
+        name, 
+        nickname, 
+        position, 
+        cpf, 
+        photo_url: photoUrl,
+        birth_date: birthDate 
+    }).eq('id', id);
+    if (error) {
+        console.error("Supabase updatePlayer error:", error);
+        throw new Error(`Falha ao atualizar jogador: ${error.message}`);
+    }
 };
 export const deletePlayer = async (id: string) => {
     const { error } = await supabase.from('players').delete().eq('id', id);
-    if (error) throw error;
+    if (error) {
+        console.error("Supabase deletePlayer error:", error);
+        throw new Error(`Falha ao deletar jogador: ${error.message}`);
+    }
 };
 
 // Staff Handlers
 export const createStaff = async (clubId: string, staff: Omit<TechnicalStaff, 'id'>) => {
-    const { error } = await supabase.from('technical_staff').insert({ id: crypto.randomUUID(), ...staff, club_id: clubId });
-    if (error) throw error;
+    const { name, role } = staff;
+    const { error } = await supabase.from('technical_staff').insert({
+        id: crypto.randomUUID(),
+        club_id: clubId,
+        name,
+        role,
+    });
+    if (error) {
+        console.error("Supabase createStaff error:", error);
+        throw new Error(`Falha ao criar membro da comissão: ${error.message}`);
+    }
 };
 export const updateStaff = async (staff: TechnicalStaff) => {
-    const { error } = await supabase.from('technical_staff').update({ name: staff.name, role: staff.role }).eq('id', staff.id);
-    if (error) throw error;
+    const { id, name, role } = staff;
+    const { error } = await supabase.from('technical_staff').update({ name, role }).eq('id', id);
+    if (error) {
+        console.error("Supabase updateStaff error:", error);
+        throw new Error(`Falha ao atualizar membro da comissão: ${error.message}`);
+    }
 };
 export const deleteStaff = async (id: string) => {
     const { error } = await supabase.from('technical_staff').delete().eq('id', id);
-    if (error) throw error;
+    if (error) {
+        console.error("Supabase deleteStaff error:", error);
+        throw new Error(`Falha ao deletar membro da comissão: ${error.message}`);
+    }
 };
 
 export const createOrGetPlaceholderClub = async (clubName: string): Promise<Club> => {

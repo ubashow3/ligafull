@@ -51,14 +51,20 @@ const AdminMatchSummaryPage: React.FC<AdminMatchSummaryPageProps> = ({ match, le
     }));
   };
   
-  const handleSaveChanges = (isFinalizing: boolean = false) => {
-    const matchToSave = {
-        ...editableMatch,
-        status: isFinalizing ? 'finished' : editableMatch.status,
-    };
-    onUpdateMatch(matchToSave);
-    setEditableMatch(matchToSave); // Also update local state to reflect status change
-    alert(`Alterações ${isFinalizing ? 'finalizadas' : 'salvas'} com sucesso!`);
+  const handleSaveDraft = () => {
+    onUpdateMatch(editableMatch);
+    alert('Rascunho salvo com sucesso!');
+  };
+
+  const handleFinalizeMatch = () => {
+    if (window.confirm('Você tem certeza que deseja FINALIZAR esta partida? Esta ação é permanente.')) {
+        if (window.confirm('CONFIRMAÇÃO FINAL: Uma vez finalizada, a súmula não poderá ser alterada. Continuar?')) {
+            const matchToSave = { ...editableMatch, status: 'finished' as const };
+            onUpdateMatch(matchToSave);
+            setEditableMatch(matchToSave);
+            alert('Partida finalizada com sucesso!');
+        }
+    }
   };
   
   const getPlayerStats = (playerId: string) => {
@@ -138,8 +144,8 @@ const AdminMatchSummaryPage: React.FC<AdminMatchSummaryPageProps> = ({ match, le
         </button>
         {editableMatch.status !== 'finished' && (
             <div className="flex gap-2">
-                <button onClick={() => handleSaveChanges(false)} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Salvar Rascunho</button>
-                <button onClick={() => handleSaveChanges(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Finalizar Jogo</button>
+                <button onClick={handleSaveDraft} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg">Salvar Rascunho</button>
+                <button onClick={handleFinalizeMatch} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Finalizar Jogo</button>
             </div>
         )}
       </div>
