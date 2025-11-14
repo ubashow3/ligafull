@@ -54,8 +54,8 @@ const MatchSummaryPage: React.FC<MatchSummaryPageProps> = ({ match, league, onBa
       <div className="w-full animate-fade-in">
           <ul className="divide-y divide-gray-700 bg-gray-900/50 rounded-md">
               <li className="p-3 grid grid-cols-5 gap-2 text-xs font-bold text-gray-400">
-                  <span className="col-span-3">Jogador</span>
                   <span className="text-center">Nº</span>
+                  <span className="col-span-3">Jogador</span>
                   <span className="text-center">Eventos</span>
               </li>
               {players.map(player => {
@@ -63,15 +63,15 @@ const MatchSummaryPage: React.FC<MatchSummaryPageProps> = ({ match, league, onBa
                   const events = match.events.filter(e => e.playerId === player.id);
                   return (
                       <li key={player.id} className="p-3 grid grid-cols-5 gap-2 items-center">
+                          <div className="text-center font-mono text-lg text-gray-300">
+                              {shirtNumber}
+                          </div>
                           <div className="col-span-3 flex items-center gap-3">
                              <img src={player.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt={player.name} className="w-10 h-10 rounded-full object-cover"/>
                              <div>
                                <p className="text-sm sm:text-base font-medium text-white truncate">{player.nickname || player.name}</p>
                                <p className="text-xs text-gray-400">{player.position}</p> 
                              </div>
-                          </div>
-                          <div className="text-center font-mono text-lg text-gray-300">
-                              {shirtNumber}
                           </div>
                           <div className="flex items-center justify-center space-x-2">
                               {events.length > 0 ? events.map((event, index) => (

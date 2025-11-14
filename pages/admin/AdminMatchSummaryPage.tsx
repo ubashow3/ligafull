@@ -120,8 +120,8 @@ const AdminMatchSummaryPage: React.FC<AdminMatchSummaryPageProps> = ({ match, le
     <div className="w-full animate-fade-in">
         <ul className="divide-y divide-gray-700 bg-gray-900/50 rounded-md">
             <li className="p-3 grid grid-cols-6 gap-2 text-xs font-bold text-gray-400">
-                <span className="col-span-2">Jogador</span>
                 <span className="text-center">Nº</span>
+                <span className="col-span-2">Jogador</span>
                 <span className="text-center">Gols</span>
                 <span className="text-center">CA</span>
                 <span className="text-center">CV</span>
@@ -131,10 +131,6 @@ const AdminMatchSummaryPage: React.FC<AdminMatchSummaryPageProps> = ({ match, le
               const shirtNumber = getPlayerShirtNumber(player.id, teamType);
               return (
                 <li key={player.id} className="p-3 grid grid-cols-6 gap-2 items-center">
-                    <div className="col-span-2">
-                       <p className="text-sm sm:text-base font-medium text-white truncate">{player.nickname || player.name}</p>
-                       <p className="text-xs text-gray-400">{player.position}</p> 
-                    </div>
                     <input 
                         type="number" 
                         min="0"
@@ -144,6 +140,10 @@ const AdminMatchSummaryPage: React.FC<AdminMatchSummaryPageProps> = ({ match, le
                         disabled={editableMatch.status === 'finished'}
                         placeholder="-"
                     />
+                    <div className="col-span-2">
+                       <p className="text-sm sm:text-base font-medium text-white truncate">{player.nickname || player.name}</p>
+                       <p className="text-xs text-gray-400">{player.position}</p> 
+                    </div>
                     <input 
                         type="number" 
                         min="0"
