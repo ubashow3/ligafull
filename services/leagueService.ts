@@ -39,79 +39,90 @@ export const uploadImage = async (file: File): Promise<string> => {
 // Helper to transform Supabase data into the nested structure the app expects
 const transformLeagues = (data: any[]): League[] => {
     if (!data) return [];
-    return data.map(league => {
-        const referees = (league.officials || []).filter((o: any) => o.type === 'referee');
-        const tableOfficials = (league.officials || []).filter((o: any) => o.type === 'table_official');
-        const officialsMap = new Map<string, string>((league.officials || []).map((o: any) => [o.id, o.name]));
+    return data
+        .filter(league => league && league.id && league.name) // Ensure the league itself is valid
+        .map(league => {
+            // Filter out null/invalid officials before processing
+            const validOfficials = (league.officials || []).filter((o: any) => o && o.id && o.name && o.type);
+            const referees = validOfficials.filter((o: any) => o.type === 'referee');
+            const tableOfficials = validOfficials.filter((o: any) => o.type === 'table_official');
+            const officialsMap = new Map<string, string>(validOfficials.map((o: any) => [o.id, o.name]));
 
-        const championships = (league.championships || []).map((champ: any) => {
-            const clubs = (champ.clubs || []).map((club: any) => ({
-                id: club.id,
-                name: club.name,
-                abbreviation: club.abbreviation,
-                logoUrl: club.logo_url,
-                whatsapp: club.whatsapp,
-                players: (club.players || []).filter(Boolean).map((p: any) => ({
-                    id: p.id,
-                    name: p.name,
-                    position: p.position,
-                    goals: Number(p.goals_in_championship) || 0,
-                    photoUrl: p.photo_url,
-                    birthDate: p.birth_date,
-                    nickname: p.nickname,
-                    cpf: p.cpf,
-                })),
-                technicalStaff: (club.technical_staff || []).map((ts: any) => ({...ts})),
-            }));
+            const championships = (league.championships || [])
+                .filter((champ: any) => champ && champ.id && champ.name) // Ensure championship is valid
+                .map((champ: any) => {
+                    const clubs = (champ.clubs || [])
+                        .filter((club: any) => club && club.id && club.name) // Ensure club is valid
+                        .map((club: any) => ({
+                            id: club.id,
+                            name: club.name,
+                            abbreviation: club.abbreviation,
+                            logoUrl: club.logo_url,
+                            whatsapp: club.whatsapp,
+                            players: (club.players || []).filter((p: any) => p && p.id && p.name).map((p: any) => ({
+                                id: p.id,
+                                name: p.name,
+                                position: p.position,
+                                goals: Number(p.goals_in_championship) || 0,
+                                photoUrl: p.photo_url,
+                                birthDate: p.birth_date,
+                                nickname: p.nickname,
+                                cpf: p.cpf,
+                            })),
+                            // More robust filtering for technical staff to prevent crashes
+                            technicalStaff: (club.technical_staff || []).filter((ts: any) => ts && ts.id && ts.name && ts.role).map((ts: any) => ({...ts})),
+                        }));
 
-            const clubMap = new Map<string, Club>(clubs.map((c: Club) => [c.id, c]));
-            
-            const matches = (champ.matches || [])
-              .filter(match => match && match.home_team_id && match.away_team_id)
-              .map((match: any) => {
-                const homeTeam = clubMap.get(match.home_team_id);
-                const awayTeam = clubMap.get(match.away_team_id);
-                
-                const getTeamObject = (teamId: string, teamData?: Club): Club => {
-                    if (teamData) return teamData;
-                    // This handles placeholder teams that might not be in the clubMap yet
-                    const placeholderName = teamId.startsWith('ph-') ? teamId.substring(3).replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Desconhecido';
-                    return { id: teamId, name: placeholderName, abbreviation: 'TBD', logoUrl: '', players: [], technicalStaff: [] };
-                };
+                    const clubMap = new Map<string, Club>(clubs.map((c: Club) => [c.id, c]));
+                    
+                    const matches = (champ.matches || [])
+                      .filter(match => match && match.home_team_id && match.away_team_id)
+                      .map((match: any) => {
+                        const homeTeam = clubMap.get(match.home_team_id);
+                        const awayTeam = clubMap.get(match.away_team_id);
+                        
+                        // This helper ensures we always get a valid Club object back, preventing crashes.
+                        const getTeamObject = (teamId: string, teamData?: Club): Club => {
+                            if (teamData) return teamData;
+                            // Create a placeholder for teams that are in matches but not in the championship's club list (data inconsistency)
+                            const placeholderName = teamId.startsWith('ph-') ? teamId.substring(3).replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Desconhecido';
+                            return { id: teamId, name: placeholderName, abbreviation: 'TBD', logoUrl: '', players: [], technicalStaff: [] };
+                        };
 
-                return {
-                    id: match.id,
-                    round: match.round,
-                    homeTeam: getTeamObject(match.home_team_id, homeTeam),
-                    awayTeam: getTeamObject(match.away_team_id, awayTeam),
-                    homeScore: match.home_score,
-                    awayScore: match.away_score,
-                    date: match.match_date,
-                    status: match.status,
-                    location: match.location,
-                    events: (match.match_events || []).map((e: any) => ({ type: e.type, playerId: e.player_id, minute: e.minute, playerName: '' })),
-                    referee: officialsMap.get(match.referee_id),
-                    assistant1: officialsMap.get(match.assistant1_id),
-                    assistant2: officialsMap.get(match.assistant2_id),
-                    tableOfficial: officialsMap.get(match.table_official_id),
-                    championship_id: match.championship_id,
-                    homeLineup: match.home_lineup || [],
-                    awayLineup: match.away_lineup || [],
-                };
+                        return {
+                            id: match.id,
+                            round: match.round,
+                            homeTeam: getTeamObject(match.home_team_id, homeTeam),
+                            awayTeam: getTeamObject(match.away_team_id, awayTeam),
+                            homeScore: match.home_score,
+                            awayScore: match.away_score,
+                            date: match.match_date,
+                            status: match.status,
+                            location: match.location,
+                             // More robust filtering for match events to prevent crashes from corrupt data
+                            events: (match.match_events || []).filter((e: any) => e && e.type && e.player_id).map((e: any) => ({ type: e.type, playerId: e.player_id, minute: e.minute, playerName: '' })),
+                            referee: officialsMap.get(match.referee_id),
+                            assistant1: officialsMap.get(match.assistant1_id),
+                            assistant2: officialsMap.get(match.assistant2_id),
+                            tableOfficial: officialsMap.get(match.table_official_id),
+                            championship_id: match.championship_id,
+                            homeLineup: match.home_lineup || [],
+                            awayLineup: match.away_lineup || [],
+                        };
+                    });
+
+                return { ...champ, clubs, matches };
             });
-
-            return { ...champ, clubs, matches };
-        });
-        
-        return {
-            ...league,
-            adminPassword: league.admin_password_hash,
-            logoUrl: league.logo_url,
-            adminEmail: league.admin_email,
-            referees,
-            tableOfficials,
-            championships
-        };
+            
+            return {
+                ...league,
+                adminPassword: league.admin_password_hash,
+                logoUrl: league.logo_url,
+                adminEmail: league.admin_email,
+                referees,
+                tableOfficials,
+                championships
+            };
     });
 };
 
@@ -189,13 +200,18 @@ const leagueQuery = `
 // Helper to correctly structure the data from the many-to-many join
 const structureChampionships = (data: any[]) => {
     if (!data) return [];
-    return data.map(league => ({
+    // Add a filter to remove any null/undefined league objects from the raw data to prevent crashes
+    return data.filter(league => !!league).map(league => ({
         ...league,
-        championships: (league.championships || []).map((champ: any) => ({
-            ...champ,
-            // More robustly filter out invalid club data from the join.
-            clubs: (champ.championship_clubs || []).map((cc: any) => cc?.clubs).filter(club => club && club.id)
-        }))
+        championships: (league.championships || []).map((champ: any) => {
+            // Also filter out null/invalid championships before processing clubs
+            if (!champ) return null;
+            return {
+                ...champ,
+                // Filter out invalid club data from the join. A club could be null if it was deleted but the link remains.
+                clubs: (champ.championship_clubs || []).map((cc: any) => cc?.clubs).filter(club => club && club.id)
+            }
+        }).filter(champ => !!champ) // Remove the null championships to prevent downstream errors
     }));
 };
 
@@ -207,10 +223,11 @@ export const fetchLeagues = async (): Promise<League[]> => {
 };
 
 export const login = async (email: string, pass: string): Promise<League | null> => {
+    if (!email || !pass) return null;
     const { data, error } = await supabase.from('leagues')
         .select(leagueQuery)
-        .eq('admin_email', email)
-        .eq('admin_password_hash', pass)
+        .ilike('admin_email', email.trim()) // Use .ilike for case-insensitive search and .trim() to remove whitespace
+        .eq('admin_password_hash', pass) // Password comparison remains case-sensitive
         .single();
     if (error || !data) return null;
     const structuredData = structureChampionships([data]);
@@ -224,8 +241,8 @@ export const createLeague = async (leagueData: { name: string, logoUrl: string, 
         name,
         slug: generateSlug(name),
         logo_url: logoUrl,
-        admin_email: adminEmail,
-        admin_password_hash: adminPassword,
+        admin_email: adminEmail.trim(), // Trim email on creation
+        admin_password_hash: adminPassword, // Don't trim password here, it might be intentional
         state,
         city,
     }).select().single();
