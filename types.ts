@@ -102,11 +102,11 @@ export interface League {
   logoUrl: string;
   adminEmail: string;
   adminPassword?: string;
+  city?: string;
+  state?: string;
   referees: Official[];
   tableOfficials: Official[];
   championships: Championship[];
-  city?: string;
-  state?: string;
 }
 
 export interface ChampionshipWizardConfig {

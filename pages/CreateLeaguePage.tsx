@@ -1,21 +1,20 @@
+
 import React, { useState, useEffect } from 'react';
 
-// Interfaces for IBGE API data
-interface Estado {
+interface IBGEState {
   id: number;
   sigla: string;
   nome: string;
 }
 
-interface Cidade {
+interface IBGECity {
   id: number;
   nome: string;
 }
 
-
 interface CreateLeaguePageProps {
   onBack: () => void;
-  onCreateLeague: (name: string, logoUrl: string, email: string, password: string, city: string, state: string) => void;
+  onCreateLeague: (name: string, logoUrl: string, email: string, password: string, state: string, city: string) => void;
   isLoading: boolean;
 }
 
@@ -24,75 +23,37 @@ const CreateLeaguePage: React.FC<CreateLeaguePageProps> = ({ onBack, onCreateLea
   const [logoUrl, setLogoUrl] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
-  // State for location dropdowns
-  const [estados, setEstados] = useState<Estado[]>([]);
-  const [cidades, setCidades] = useState<Cidade[]>([]);
-  const [selectedEstado, setSelectedEstado] = useState(''); // Stores state abbreviation (e.g., 'SP')
-  const [selectedCidade, setSelectedCidade] = useState('');
-  
-  const [loadingEstados, setLoadingEstados] = useState(true);
-  const [loadingCidades, setLoadingCidades] = useState(false);
+  const [states, setStates] = useState<IBGEState[]>([]);
+  const [cities, setCities] = useState<IBGECity[]>([]);
+  const [selectedState, setSelectedState] = useState('');
+  const [selectedCity, setSelectedCity] = useState('');
 
-
-  // Fetch states on component mount
   useEffect(() => {
-    const fetchEstados = async () => {
-      try {
-        setLoadingEstados(true);
-        const response = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome');
-        if (!response.ok) throw new Error('Failed to fetch states');
-        const data: Estado[] = await response.json();
-        setEstados(data);
-      } catch (error) {
-        console.error("Error fetching states:", error);
-        alert("Não foi possível carregar a lista de estados. Tente novamente.");
-      } finally {
-        setLoadingEstados(false);
-      }
-    };
-    fetchEstados();
+    fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome')
+      .then(res => res.json())
+      .then(setStates);
   }, []);
 
-  // Fetch cities when a state is selected
   useEffect(() => {
-    if (!selectedEstado) {
-      setCidades([]);
-      setSelectedCidade('');
-      return;
+    if (selectedState) {
+      fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${selectedState}/municipios`)
+        .then(res => res.json())
+        .then(setCities);
+    } else {
+      setCities([]);
     }
-
-    const fetchCidades = async () => {
-      try {
-        setLoadingCidades(true);
-        const response = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${selectedEstado}/municipios`);
-        if (!response.ok) throw new Error('Failed to fetch cities');
-        const data: Cidade[] = await response.json();
-        setCidades(data);
-      } catch (error) {
-        console.error("Error fetching cities:", error);
-        alert("Não foi possível carregar a lista de cidades. Tente novamente.");
-      } finally {
-        setLoadingCidades(false);
-      }
-    };
-    
-    fetchCidades();
-  }, [selectedEstado]);
-
-  const handleEstadoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedEstado(e.target.value);
-    setSelectedCidade(''); // Reset city selection
-  };
+    setSelectedCity('');
+  }, [selectedState]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
-    if (name.trim() && email.trim() && password.trim() && selectedCidade && selectedEstado) {
-      onCreateLeague(name.trim(), logoUrl.trim(), email.trim(), password.trim(), selectedCidade, selectedEstado);
-    } else {
+
+    if (!name.trim() || !email.trim() || !password.trim() || !selectedState || !selectedCity) {
       alert('Todos os campos, exceto o logo, são obrigatórios.');
+      return;
     }
+    onCreateLeague(name.trim(), logoUrl.trim(), email.trim(), password.trim(), selectedState, selectedCity);
   };
 
   return (
@@ -115,110 +76,49 @@ const CreateLeaguePage: React.FC<CreateLeaguePageProps> = ({ onBack, onCreateLea
           <fieldset disabled={isLoading}>
             <div>
                 <label htmlFor="league-name" className="block text-sm font-medium text-gray-300">Nome da Liga</label>
-                <input 
-                  type="text" 
-                  name="league-name" 
-                  id="league-name" 
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50" 
-                />
+                <input type="text" name="league-name" id="league-name" value={name} onChange={(e) => setName(e.target.value)} required className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50" />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div>
-                  <label htmlFor="league-state" className="block text-sm font-medium text-gray-300">Estado</label>
-                  <select 
-                    id="league-state" 
-                    name="league-state"
-                    value={selectedEstado}
-                    onChange={handleEstadoChange}
-                    required
-                    disabled={loadingEstados || isLoading}
-                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50"
-                  >
-                    <option value="" disabled>{loadingEstados ? 'Carregando...' : 'Selecione um estado'}</option>
-                    {estados.map(estado => (
-                      <option key={estado.id} value={estado.sigla}>{estado.nome}</option>
-                    ))}
-                  </select>
-              </div>
-              <div>
-                  <label htmlFor="league-city" className="block text-sm font-medium text-gray-300">Cidade</label>
-                  <select 
-                    id="league-city" 
-                    name="league-city"
-                    value={selectedCidade}
-                    onChange={(e) => setSelectedCidade(e.target.value)}
-                    required
-                    disabled={!selectedEstado || loadingCidades || isLoading}
-                    className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50"
-                  >
-                     <option value="" disabled>{loadingCidades ? 'Carregando cidades...' : (selectedEstado ? 'Selecione uma cidade' : 'Escolha um estado primeiro')}</option>
-                    {cidades.map(cidade => (
-                      <option key={cidade.id} value={cidade.nome}>{cidade.nome}</option>
-                    ))}
-                  </select>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label htmlFor="state" className="block text-sm font-medium text-gray-300">Estado</label>
+                    <select id="state" value={selectedState} onChange={e => setSelectedState(e.target.value)} required className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50">
+                        <option value="" disabled>Selecione o Estado</option>
+                        {states.map(state => <option key={state.id} value={state.sigla}>{state.nome}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label htmlFor="city" className="block text-sm font-medium text-gray-300">Cidade</label>
+                    <select id="city" value={selectedCity} onChange={e => setSelectedCity(e.target.value)} required disabled={!selectedState} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50">
+                        <option value="" disabled>Selecione a Cidade</option>
+                        {cities.map(city => <option key={city.id} value={city.nome}>{city.nome}</option>)}
+                    </select>
+                </div>
             </div>
 
-             <div>
+            <div>
                 <label htmlFor="admin-email" className="block text-sm font-medium text-gray-300">E-mail do Administrador</label>
-                <input 
-                  type="email" 
-                  name="admin-email" 
-                  id="admin-email" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50" 
-                />
+                <input type="email" name="admin-email" id="admin-email" value={email} onChange={(e) => setEmail(e.target.value)} required className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50" />
             </div>
             
             <div>
                 <label htmlFor="league-password" className="block text-sm font-medium text-gray-300">Senha do Administrador</label>
-                <input 
-                  type="password" 
-                  name="league-password" 
-                  id="league-password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50" 
-                />
+                <input type="password" name="league-password" id="league-password" value={password} onChange={(e) => setPassword(e.target.value)} required className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50" />
             </div>
 
             <div>
                 <label htmlFor="league-logo" className="block text-sm font-medium text-gray-300">Logo da Liga (URL)</label>
-                <input 
-                  type="text" 
-                  name="league-logo" 
-                  id="league-logo" 
-                  value={logoUrl}
-                  onChange={(e) => setLogoUrl(e.target.value)}
-                  className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50" 
-                  placeholder="https://exemplo.com/logo.png"
-                />
+                <input type="text" name="league-logo" id="league-logo" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm disabled:opacity-50" placeholder="https://exemplo.com/logo.png" />
             </div>
           </fieldset>
             <div className="flex justify-end gap-4 pt-4">
-              <button 
-                type="button" 
-                onClick={onBack}
-                disabled={isLoading}
-                className="py-2 px-4 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 disabled:opacity-50"
-              >
+              <button type="button" onClick={onBack} disabled={isLoading} className="py-2 px-4 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 disabled:opacity-50">
                   Cancelar
               </button>
-              <button 
-                type="submit" 
-                disabled={isLoading}
-                className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 flex items-center justify-center w-32 disabled:bg-gray-500 disabled:cursor-not-allowed"
-              >
+              <button type="submit" disabled={isLoading} className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 flex items-center justify-center w-32 disabled:bg-gray-500 disabled:cursor-not-allowed">
                   {isLoading ? (
                     <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>

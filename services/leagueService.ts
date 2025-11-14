@@ -154,16 +154,16 @@ export const login = async (email: string, pass: string): Promise<League | null>
     return transformLeagues([data])[0];
 };
 
-export const createLeague = async (leagueData: { name: string, logoUrl: string, adminEmail: string, adminPassword: string, city: string, state: string }): Promise<League> => {
-    const { name, logoUrl, adminEmail, adminPassword, city, state } = leagueData;
+export const createLeague = async (leagueData: { name: string, logoUrl: string, adminEmail: string, adminPassword: string, state: string, city: string }): Promise<League> => {
+    const { name, logoUrl, adminEmail, adminPassword, state, city } = leagueData;
     const { data, error } = await supabase.from('leagues').insert({
         name,
         slug: generateSlug(name),
         logo_url: logoUrl || `https://picsum.photos/seed/${Date.now()}/200/200`,
         admin_email: adminEmail,
         admin_password_hash: adminPassword,
-        city,
         state,
+        city,
     }).select().single();
 
     if (error) {
@@ -189,8 +189,8 @@ export const createLeague = async (leagueData: { name: string, logoUrl: string, 
         logoUrl: data.logo_url,
         adminEmail: data.admin_email,
         adminPassword: data.admin_password_hash,
-        city: data.city,
         state: data.state,
+        city: data.city,
         championships: [],
         referees: [],
         tableOfficials: [],
