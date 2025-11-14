@@ -312,35 +312,44 @@ export const updateMatch = async (match: Match, league: League) => {
 
 // Official Handlers
 export const createOfficial = async (leagueId: string, type: 'referees' | 'tableOfficials', official: Omit<Official, 'id'>) => {
-    await supabase.from('officials').insert({ id: crypto.randomUUID(), ...official, league_id: leagueId, type: type === 'referees' ? 'referee' : 'table_official', bank_account: official.bankAccount });
+    const { error } = await supabase.from('officials').insert({ id: crypto.randomUUID(), ...official, league_id: leagueId, type: type === 'referees' ? 'referee' : 'table_official', bank_account: official.bankAccount });
+    if (error) throw error;
 };
 export const updateOfficial = async (official: Official) => {
-    await supabase.from('officials').update({ name: official.name, nickname: official.nickname, cpf: official.cpf, bank_account: official.bankAccount }).eq('id', official.id);
+    const { error } = await supabase.from('officials').update({ name: official.name, nickname: official.nickname, cpf: official.cpf, bank_account: official.bankAccount }).eq('id', official.id);
+    if (error) throw error;
 };
 export const deleteOfficial = async (id: string) => {
-    await supabase.from('officials').delete().eq('id', id);
+    const { error } = await supabase.from('officials').delete().eq('id', id);
+    if (error) throw error;
 };
 
 // Player Handlers
 export const createPlayer = async (clubId: string, player: Omit<Player, 'id'>) => {
-    await supabase.from('players').insert({ id: crypto.randomUUID(), ...player, club_id: clubId, photo_url: player.photoUrl, birth_date: player.birthDate, goals_in_championship: 0 });
+    const { error } = await supabase.from('players').insert({ id: crypto.randomUUID(), ...player, club_id: clubId, photo_url: player.photoUrl, birth_date: player.birthDate, goals_in_championship: 0 });
+    if (error) throw error;
 };
 export const updatePlayer = async (player: Player) => {
-    await supabase.from('players').update({ name: player.name, nickname: player.nickname, position: player.position, cpf: player.cpf, photo_url: player.photoUrl }).eq('id', player.id);
+    const { error } = await supabase.from('players').update({ name: player.name, nickname: player.nickname, position: player.position, cpf: player.cpf, photo_url: player.photoUrl }).eq('id', player.id);
+    if (error) throw error;
 };
 export const deletePlayer = async (id: string) => {
-    await supabase.from('players').delete().eq('id', id);
+    const { error } = await supabase.from('players').delete().eq('id', id);
+    if (error) throw error;
 };
 
 // Staff Handlers
 export const createStaff = async (clubId: string, staff: Omit<TechnicalStaff, 'id'>) => {
-    await supabase.from('technical_staff').insert({ id: crypto.randomUUID(), ...staff, club_id: clubId });
+    const { error } = await supabase.from('technical_staff').insert({ id: crypto.randomUUID(), ...staff, club_id: clubId });
+    if (error) throw error;
 };
 export const updateStaff = async (staff: TechnicalStaff) => {
-    await supabase.from('technical_staff').update({ name: staff.name, role: staff.role }).eq('id', staff.id);
+    const { error } = await supabase.from('technical_staff').update({ name: staff.name, role: staff.role }).eq('id', staff.id);
+    if (error) throw error;
 };
 export const deleteStaff = async (id: string) => {
-    await supabase.from('technical_staff').delete().eq('id', id);
+    const { error } = await supabase.from('technical_staff').delete().eq('id', id);
+    if (error) throw error;
 };
 
 export const createOrGetPlaceholderClub = async (clubName: string): Promise<Club> => {
