@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { League, Championship } from '../types';
 
 interface LeaguePageProps {
@@ -12,6 +12,28 @@ interface LeaguePageProps {
 const LeaguePage: React.FC<LeaguePageProps> = ({ league, onSelectChampionship, onBack, isAdminMode, onCreateChampionship }) => {
   const [showAddChampForm, setShowAddChampForm] = useState(false);
   const [newChampName, setNewChampName] = useState('');
+
+  useEffect(() => {
+    if (isAdminMode) return;
+
+    const favoriteLeagueId = localStorage.getItem('favoriteLeagueId');
+    if (favoriteLeagueId === league.id) {
+        return; // It's already the favorite, do nothing.
+    }
+
+    const message = favoriteLeagueId
+        ? `Deseja trocar sua liga preferida por "${league.name}"?`
+        : `Deseja definir "${league.name}" como sua liga preferida? Ela aparecerá no topo da lista na página inicial.`;
+
+    // Use a timeout to prevent the confirm dialog from blocking the initial page render
+    setTimeout(() => {
+        if (window.confirm(message)) {
+            localStorage.setItem('favoriteLeagueId', league.id);
+            alert(`"${league.name}" foi definida como sua liga preferida!`);
+        }
+    }, 500);
+  }, [league.id, league.name, isAdminMode]);
+
 
   const handleAddChampionship = (e: React.FormEvent) => {
     e.preventDefault();
