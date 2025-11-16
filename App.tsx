@@ -260,6 +260,15 @@ const App: React.FC = () => {
         alert(`Erro ao atualizar status de pagamento: ${(error as Error).message}`);
     }
   };
+  
+  const handleUpdateClubFinePaymentStatus = async (championshipId: string, clubId: string, round: number, isPaid: boolean) => {
+    try {
+        await leagueService.updateClubFinePaymentStatus(championshipId, clubId, round, isPaid);
+        await fetchData();
+    } catch (error) {
+        alert(`Erro ao atualizar status de pagamento da multa: ${(error as Error).message}`);
+    }
+  };
 
   const onUpdateMatch = async (updatedMatch: Match) => {
     if (!adminLeague) return;
@@ -542,6 +551,7 @@ const App: React.FC = () => {
                                                 onDeleteStaff={handleDeleteStaff}
                                                 onSaveFinancials={handleSaveChampionshipFinancials}
                                                 onUpdateClubRegistrationStatus={handleUpdateClubRegistrationStatus}
+                                                onUpdateClubFinePaymentStatus={handleUpdateClubFinePaymentStatus}
                                                />;
                 break;
 

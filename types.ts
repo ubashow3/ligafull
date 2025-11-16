@@ -88,6 +88,7 @@ export interface ChampionshipFinancials {
     totalCost: number;
     registrationFeePerClub: number;
     clubPayments?: { [clubId:string]: boolean };
+    finePayments?: { [clubId: string]: { [round: number]: boolean } };
 }
 
 export interface Championship {

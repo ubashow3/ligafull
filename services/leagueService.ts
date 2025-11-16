@@ -177,6 +177,7 @@ const transformLeagues = (data: any[]): League[] => {
                                 yellowCardFine: Number(rawFinancials.yellowCardFine) || 0, redCardFine: Number(rawFinancials.redCardFine) || 0,
                                 totalCost: Number(rawFinancials.totalCost) || 0, registrationFeePerClub: Number(rawFinancials.registrationFeePerClub) || 0,
                                 clubPayments: rawFinancials.clubPayments || {},
+                                finePayments: rawFinancials.finePayments || {},
                             };
                         }
                     } catch(e) { console.error("Error processing financials for championship, continuing without financials:", champData.id, e); financials = undefined; }
@@ -704,5 +705,43 @@ export const updateClubRegistrationStatus = async (championshipId: string, clubI
     if (updateError) {
         console.error("Supabase updateClubRegistrationStatus (update) error:", updateError);
         throw new Error(`Falha ao atualizar status de pagamento: ${updateError.message}`);
+    }
+};
+
+export const updateClubFinePaymentStatus = async (championshipId: string, clubId: string, round: number, isPaid: boolean) => {
+    const { data, error: fetchError } = await supabase
+        .from('championships')
+        .select('financials')
+        .eq('id', championshipId)
+        .single();
+    
+    if (fetchError) {
+        console.error("Supabase updateClubFinePaymentStatus (fetch) error:", fetchError);
+        throw new Error(`Falha ao buscar dados financeiros: ${fetchError.message}`);
+    }
+
+    const currentFinancials = (data?.financials || {}) as Partial<ChampionshipFinancials>;
+    
+    const clubFinePayments = currentFinancials.finePayments?.[clubId] || {};
+
+    const updatedFinancials = {
+        ...currentFinancials,
+        finePayments: {
+            ...(currentFinancials.finePayments || {}),
+            [clubId]: {
+                ...clubFinePayments,
+                [round]: isPaid,
+            },
+        },
+    };
+
+    const { error: updateError } = await supabase
+        .from('championships')
+        .update({ financials: updatedFinancials })
+        .eq('id', championshipId);
+
+    if (updateError) {
+        console.error("Supabase updateClubFinePaymentStatus (update) error:", updateError);
+        throw new Error(`Falha ao atualizar status de pagamento da multa: ${updateError.message}`);
     }
 };

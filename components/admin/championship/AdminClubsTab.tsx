@@ -81,6 +81,7 @@ interface AdminClubsTabProps {
   onCreateClub: (name: string, abbreviation: string, logoUrl: string, whatsapp: string) => void;
   onPlayerClick: (player: Player) => void;
   onUpdateClubRegistrationStatus: (championshipId: string, clubId: string, isPaid: boolean) => void;
+  onUpdateClubFinePaymentStatus: (championshipId: string, clubId: string, round: number, isPaid: boolean) => void;
   // Player Props
   onUpdatePlayer: (clubId: string, updatedPlayer: Player) => void;
   onCreatePlayer: (clubId: string, name: string, position: string, nickname: string, cpf: string, photoUrl: string) => void;
@@ -160,6 +161,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
     onCreateClub, 
     onPlayerClick,
     onUpdateClubRegistrationStatus,
+    onUpdateClubFinePaymentStatus,
     onUpdatePlayer, 
     onCreatePlayer, 
     onDeletePlayer,
@@ -312,31 +314,38 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
     setEditingStaff(null);
   };
   
-  const calculateClubFines = (club: Club, championship: Championship) => {
+  const getClubFinesByRound = (club: Club, championship: Championship) => {
     const yellowFine = championship.financials?.yellowCardFine || 0;
     const redFine = championship.financials?.redCardFine || 0;
-    let totalFine = 0;
-    let yellowCount = 0;
-    let redCount = 0;
     const playerIds = new Set(club.players.map(p => p.id));
+    
+    const finesByRound: { [round: number]: { totalFine: number; cards: any[] } } = {};
 
     championship.matches.forEach(match => {
         if (match.status === 'finished' || match.status === 'in_progress') {
              match.events.forEach(event => {
                 if (playerIds.has(event.playerId)) {
-                    if (event.type === 'yellow_card') {
-                        totalFine += yellowFine;
-                        yellowCount++;
-                    } else if (event.type === 'red_card') {
-                        totalFine += redFine;
-                        redCount++;
+                    if (event.type === 'yellow_card' || event.type === 'red_card') {
+                        if (!finesByRound[match.round]) {
+                            finesByRound[match.round] = { totalFine: 0, cards: [] };
+                        }
+                        const fine = event.type === 'yellow_card' ? yellowFine : redFine;
+                        finesByRound[match.round].totalFine += fine;
+                        finesByRound[match.round].cards.push({
+                            ...event,
+                            fine,
+                            date: match.date
+                        });
                     }
                 }
             });
         }
     });
 
-    return { totalFine, yellowCount, redCount };
+    return Object.entries(finesByRound).map(([round, data]) => ({
+        round: parseInt(round, 10),
+        ...data
+    })).sort((a, b) => a.round - b.round);
   };
 
   return (
@@ -401,10 +410,15 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                 }
             }).reverse();
 
-            const fines = calculateClubFines(club, championship);
+            const finesByRound = getClubFinesByRound(club, championship);
             const registrationFee = championship.financials?.registrationFeePerClub || 0;
-            const totalDue = registrationFee + fines.totalFine;
             const isRegistrationPaid = championship.financials?.clubPayments?.[club.id] || false;
+            
+            const unpaidFines = finesByRound
+                .filter(fine => !championship.financials?.finePayments?.[club.id]?.[fine.round])
+                .reduce((acc, curr) => acc + curr.totalFine, 0);
+
+            const totalDue = (isRegistrationPaid ? 0 : registrationFee) + unpaidFines;
 
 
             return (
@@ -604,22 +618,54 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                             </div>
                         </div>
 
-                        <div className="p-2 bg-gray-900/50 rounded-lg">
-                            <p className="font-semibold text-gray-300 mb-2">Multas por Cartões</p>
-                            <div className="space-y-1">
-                                <div className="flex justify-between">
-                                    <span className="text-gray-400">Cartões Amarelos ({fines.yellowCount}):</span>
-                                    <span className="text-white">{(fines.yellowCount * (championship.financials?.yellowCardFine || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        <div className="p-3 bg-gray-900/50 rounded-lg">
+                            <p className="font-semibold text-gray-300 mb-2">Multas por Rodada</p>
+                            {finesByRound.length > 0 ? (
+                                <div className="space-y-3">
+                                    {finesByRound.map(({ round, totalFine, cards }) => {
+                                        const isRoundPaid = championship.financials?.finePayments?.[club.id]?.[round] || false;
+                                        return (
+                                            <div key={round} className="p-2 bg-gray-800/70 rounded">
+                                                <div className="flex justify-between items-center">
+                                                    <div>
+                                                        <span className="font-bold text-white">{round}ª Rodada: </span>
+                                                        <span className="font-semibold text-red-400">{totalFine.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                                    </div>
+                                                     <div className="flex items-center gap-3">
+                                                        <span className={`text-xs font-bold ${isRoundPaid ? 'text-green-400' : 'text-yellow-400'}`}>
+                                                            {isRoundPaid ? 'PAGO' : 'PENDENTE'}
+                                                        </span>
+                                                         <label htmlFor={`fine-paid-toggle-${club.id}-${round}`} className="flex items-center cursor-pointer">
+                                                            <div className="relative">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    id={`fine-paid-toggle-${club.id}-${round}`}
+                                                                    className="sr-only peer"
+                                                                    checked={isRoundPaid}
+                                                                    onChange={(e) => onUpdateClubFinePaymentStatus(championship.id, club.id, round, e.target.checked)}
+                                                                />
+                                                                <div className="block bg-gray-600 w-10 h-5 rounded-full peer-checked:bg-green-600"></div>
+                                                                <div className="dot absolute left-0.5 top-0.5 bg-white w-4 h-4 rounded-full transition-transform peer-checked:translate-x-5"></div>
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <ul className="mt-2 pl-4 space-y-1 text-xs text-gray-400">
+                                                    {cards.map((card, index) => (
+                                                        <li key={index} className="flex items-center gap-2">
+                                                            {card.type === 'yellow_card' ? <div className="w-2 h-3 bg-yellow-400 rounded-sm flex-shrink-0" /> : <div className="w-2 h-3 bg-red-600 rounded-sm flex-shrink-0" />}
+                                                            <span>{card.playerName} ({new Date(card.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})</span>
+                                                            <span className="ml-auto font-mono">{card.fine.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-400">Cartões Vermelhos ({fines.redCount}):</span>
-                                    <span className="text-white">{(fines.redCount * (championship.financials?.redCardFine || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                </div>
-                                <div className="flex justify-between pt-1 border-t border-gray-700 mt-1">
-                                    <span className="font-semibold text-gray-300">Total de Multas:</span>
-                                    <span className="font-bold text-white">{fines.totalFine.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                </div>
-                            </div>
+                            ) : (
+                                <p className="text-xs text-gray-500 text-center">Nenhuma multa registrada.</p>
+                            )}
                         </div>
                         
                         <div className="flex justify-between p-3 bg-red-500/10 rounded-lg mt-2">
