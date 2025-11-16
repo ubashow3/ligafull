@@ -29,6 +29,7 @@ interface AdminChampionshipPageProps {
   onUpdateMatch: (updatedMatch: Match) => void;
   onNavigateToCreateMatches: () => void;
   onSaveFinancials: (championshipId: string, financials: ChampionshipFinancials) => void;
+  onUpdateClubRegistrationStatus: (championshipId: string, clubId: string, isPaid: boolean) => void;
   // Player props
   onUpdatePlayer: (clubId: string, updatedPlayer: Player) => void;
   onCreatePlayer: (clubId: string, name: string, position: string, nickname: string, cpf: string, photoUrl: string) => void;
@@ -49,6 +50,7 @@ const AdminChampionshipPage: React.FC<AdminChampionshipPageProps> = ({
   onUpdateMatch,
   onNavigateToCreateMatches,
   onSaveFinancials,
+  onUpdateClubRegistrationStatus,
   onUpdatePlayer,
   onCreatePlayer,
   onDeletePlayer,
@@ -123,6 +125,7 @@ const AdminChampionshipPage: React.FC<AdminChampionshipPageProps> = ({
                 onUpdateStaff={onUpdateStaff}
                 onDeleteStaff={onDeleteStaff}
                 onPlayerClick={setSelectedPlayer}
+                onUpdateClubRegistrationStatus={onUpdateClubRegistrationStatus}
             />
         )}
         {activeTab === 'standings' && <AdminStandingsTab standings={championship.standings} />}

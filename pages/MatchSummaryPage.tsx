@@ -110,7 +110,7 @@ const MatchSummaryPage: React.FC<MatchSummaryPageProps> = ({ match, league, onBa
                 <span className="font-bold text-base sm:text-lg text-white">{match.homeTeam.name}</span>
               </div>
               <div className="text-xl sm:text-3xl font-bold text-white text-center">
-                {match.status === 'finished' ? `${match.homeScore} x ${match.awayScore}` : 'x'}
+                {match.homeScore != null && match.awayScore != null ? `${match.homeScore} x ${match.awayScore}` : 'x'}
               </div>
               <div className="flex flex-col items-center text-center w-2/5">
                 <img src={match.awayTeam.logoUrl} alt={match.awayTeam.name} className="w-12 h-12 sm:w-16 sm:h-16 rounded-full mb-2 object-cover" />

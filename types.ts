@@ -87,6 +87,7 @@ export interface ChampionshipFinancials {
     redCardFine: number;
     totalCost: number;
     registrationFeePerClub: number;
+    clubPayments?: { [clubId:string]: boolean };
 }
 
 export interface Championship {

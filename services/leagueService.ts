@@ -114,7 +114,7 @@ const transformLeagues = (data: any[]): League[] => {
                                 id: String(clubData.id), name: String(clubData.name || 'Nome Inválido'),
                                 abbreviation: String(clubData.abbreviation || '---'), logoUrl: String(clubData.logo_url || ''),
                                 whatsapp: String(clubData.whatsapp || ''),
-                                players, technicalStaff,
+                                players, technicalStaff
                             });
                         } catch (e) { console.error("Error processing a club record, skipping:", clubData, e); }
                     }
@@ -176,6 +176,7 @@ const transformLeagues = (data: any[]): League[] => {
                                 tableOfficialFee: Number(rawFinancials.tableOfficialFee) || 0, fieldFee: Number(rawFinancials.fieldFee) || 0,
                                 yellowCardFine: Number(rawFinancials.yellowCardFine) || 0, redCardFine: Number(rawFinancials.redCardFine) || 0,
                                 totalCost: Number(rawFinancials.totalCost) || 0, registrationFeePerClub: Number(rawFinancials.registrationFeePerClub) || 0,
+                                clubPayments: rawFinancials.clubPayments || {},
                             };
                         }
                     } catch(e) { console.error("Error processing financials for championship, continuing without financials:", champData.id, e); financials = undefined; }
@@ -284,7 +285,12 @@ const structureChampionships = (data: any[]): any[] => {
                 try {
                     if (!champ || typeof champ !== 'object') return null;
                     const clubs = (Array.isArray(champ.championship_clubs) ? champ.championship_clubs : [])
-                        .map((cc: any) => (cc && typeof cc === 'object' && cc.clubs && typeof cc.clubs === 'object' ? cc.clubs : null))
+                        .map((cc: any) => {
+                            if (cc && typeof cc === 'object' && cc.clubs && typeof cc.clubs === 'object') {
+                                return { ...cc.clubs };
+                            }
+                            return null;
+                        })
                         .filter(club => club && typeof club === 'object' && club.id);
                     return { ...champ, clubs };
                 } catch (e) {
@@ -663,4 +669,40 @@ export const createOrGetPlaceholderClub = async (clubName: string): Promise<Club
         players: [],
         technicalStaff: []
     };
+};
+
+export const updateClubRegistrationStatus = async (championshipId: string, clubId: string, isPaid: boolean) => {
+    // 1. Fetch current financials
+    const { data, error: fetchError } = await supabase
+        .from('championships')
+        .select('financials')
+        .eq('id', championshipId)
+        .single();
+    
+    if (fetchError) {
+        console.error("Supabase updateClubRegistrationStatus (fetch) error:", fetchError);
+        throw new Error(`Falha ao buscar dados financeiros: ${fetchError.message}`);
+    }
+
+    const currentFinancials = (data?.financials || {}) as Partial<ChampionshipFinancials>;
+
+    // 2. Update the clubPayments map
+    const updatedFinancials = {
+        ...currentFinancials,
+        clubPayments: {
+            ...(currentFinancials.clubPayments || {}),
+            [clubId]: isPaid,
+        },
+    };
+
+    // 3. Save the updated financials object
+    const { error: updateError } = await supabase
+        .from('championships')
+        .update({ financials: updatedFinancials })
+        .eq('id', championshipId);
+
+    if (updateError) {
+        console.error("Supabase updateClubRegistrationStatus (update) error:", updateError);
+        throw new Error(`Falha ao atualizar status de pagamento: ${updateError.message}`);
+    }
 };

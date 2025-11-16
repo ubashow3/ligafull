@@ -80,6 +80,7 @@ interface AdminClubsTabProps {
   championshipId: string;
   onCreateClub: (name: string, abbreviation: string, logoUrl: string, whatsapp: string) => void;
   onPlayerClick: (player: Player) => void;
+  onUpdateClubRegistrationStatus: (championshipId: string, clubId: string, isPaid: boolean) => void;
   // Player Props
   onUpdatePlayer: (clubId: string, updatedPlayer: Player) => void;
   onCreatePlayer: (clubId: string, name: string, position: string, nickname: string, cpf: string, photoUrl: string) => void;
@@ -158,6 +159,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
     championshipId,
     onCreateClub, 
     onPlayerClick,
+    onUpdateClubRegistrationStatus,
     onUpdatePlayer, 
     onCreatePlayer, 
     onDeletePlayer,
@@ -170,6 +172,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
       performance: false,
       players: true,
       staff: false,
+      financials: false,
   });
   
   // Club form state
@@ -205,7 +208,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
     const isOpeningNewClub = expandedClub !== clubId;
     setExpandedClub(prevId => (prevId === clubId ? null : clubId));
     if (isOpeningNewClub) {
-        setOpenSections({ performance: false, players: true, staff: false });
+        setOpenSections({ performance: false, players: true, staff: false, financials: false });
     }
   };
 
@@ -308,6 +311,33 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
     onUpdateStaff(clubId, editingStaff);
     setEditingStaff(null);
   };
+  
+  const calculateClubFines = (club: Club, championship: Championship) => {
+    const yellowFine = championship.financials?.yellowCardFine || 0;
+    const redFine = championship.financials?.redCardFine || 0;
+    let totalFine = 0;
+    let yellowCount = 0;
+    let redCount = 0;
+    const playerIds = new Set(club.players.map(p => p.id));
+
+    championship.matches.forEach(match => {
+        if (match.status === 'finished' || match.status === 'in_progress') {
+             match.events.forEach(event => {
+                if (playerIds.has(event.playerId)) {
+                    if (event.type === 'yellow_card') {
+                        totalFine += yellowFine;
+                        yellowCount++;
+                    } else if (event.type === 'red_card') {
+                        totalFine += redFine;
+                        redCount++;
+                    }
+                }
+            });
+        }
+    });
+
+    return { totalFine, yellowCount, redCount };
+  };
 
   return (
     <div>
@@ -370,6 +400,12 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                     return match.awayScore! > match.homeScore! ? 'W' : 'L';
                 }
             }).reverse();
+
+            const fines = calculateClubFines(club, championship);
+            const registrationFee = championship.financials?.registrationFeePerClub || 0;
+            const totalDue = registrationFee + fines.totalFine;
+            const isRegistrationPaid = championship.financials?.clubPayments?.[club.id] || false;
+
 
             return (
             <div key={club.id} className="bg-gray-700/50 rounded-lg overflow-hidden">
@@ -539,6 +575,60 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                       {club.technicalStaff.length === 0 && <li className="py-2 text-center text-gray-500">Nenhum membro cadastrado.</li>}
                     </ul>
                   </CollapsibleSection>
+
+                  {/* Financials Section */}
+                  <CollapsibleSection title="Financeiro" isOpen={openSections.financials} onToggle={() => toggleSection('financials')}>
+                    <div className="space-y-4 text-sm">
+                        <div className="flex justify-between items-center p-2 bg-gray-900/50 rounded-lg">
+                            <div>
+                                <p className="font-semibold text-gray-300">Taxa de Inscrição</p>
+                                <p className="text-xl font-bold text-white">{registrationFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className={`text-xs font-bold ${isRegistrationPaid ? 'text-green-400' : 'text-yellow-400'}`}>
+                                    {isRegistrationPaid ? 'PAGO' : 'PENDENTE'}
+                                </span>
+                                <label htmlFor={`paid-toggle-${club.id}`} className="flex items-center cursor-pointer">
+                                    <div className="relative">
+                                        <input
+                                            type="checkbox"
+                                            id={`paid-toggle-${club.id}`}
+                                            className="sr-only peer"
+                                            checked={isRegistrationPaid}
+                                            onChange={(e) => onUpdateClubRegistrationStatus(championship.id, club.id, e.target.checked)}
+                                        />
+                                        <div className="block bg-gray-600 w-12 h-6 rounded-full peer-checked:bg-green-600"></div>
+                                        <div className="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform peer-checked:translate-x-5"></div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="p-2 bg-gray-900/50 rounded-lg">
+                            <p className="font-semibold text-gray-300 mb-2">Multas por Cartões</p>
+                            <div className="space-y-1">
+                                <div className="flex justify-between">
+                                    <span className="text-gray-400">Cartões Amarelos ({fines.yellowCount}):</span>
+                                    <span className="text-white">{(fines.yellowCount * (championship.financials?.yellowCardFine || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-gray-400">Cartões Vermelhos ({fines.redCount}):</span>
+                                    <span className="text-white">{(fines.redCount * (championship.financials?.redCardFine || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                </div>
+                                <div className="flex justify-between pt-1 border-t border-gray-700 mt-1">
+                                    <span className="font-semibold text-gray-300">Total de Multas:</span>
+                                    <span className="font-bold text-white">{fines.totalFine.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="flex justify-between p-3 bg-red-500/10 rounded-lg mt-2">
+                            <span className="font-bold text-red-300">Total a Pagar:</span>
+                            <span className="font-bold text-xl text-red-300">{totalDue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </div>
+                    </div>
+                  </CollapsibleSection>
+
                 </div>
               )}
             </div>

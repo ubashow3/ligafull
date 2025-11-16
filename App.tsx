@@ -110,26 +110,28 @@ const App: React.FC = () => {
         console.error("Failed to fetch data:", error);
 
         let message = 'Ocorreu um erro desconhecido.';
+
         if (error instanceof Error) {
             message = error.message;
-        } else if (typeof error === 'object' && error !== null) {
-            if ('message' in error && typeof (error as any).message === 'string') {
-                message = (error as any).message;
-                if ('details' in error && typeof (error as any).details === 'string') {
-                    message += `\nDetalhes: ${(error as any).details}`;
-                }
-                if ('hint' in error && typeof (error as any).hint === 'string') {
-                    message += `\nDica: ${(error as any).hint}`;
-                }
-            } else {
-                try {
-                    message = JSON.stringify(error, null, 2);
-                } catch {
-                    message = 'Não foi possível converter o objeto de erro para texto.';
-                }
+        } else if (error && typeof error === 'object' && 'message' in error) {
+            // Handle Supabase/PostgREST error objects
+            message = String((error as any).message);
+            if ('details' in error && typeof (error as any).details === 'string') {
+                message += `\nDetalhes: ${(error as any).details}`;
             }
+            if ('hint' in error && typeof (error as any).hint === 'string') {
+                message += `\nDica: ${(error as any).hint}`;
+            }
+        } else if (typeof error === 'string') {
+            message = error;
         } else {
-            message = String(error);
+            try {
+                // For other kinds of objects
+                message = JSON.stringify(error, null, 2);
+            } catch {
+                // Fallback for circular structures or other stringify errors
+                message = 'Ocorreu um erro complexo. Verifique o console do navegador para mais detalhes.';
+            }
         }
 
         alert(`Falha ao carregar dados:\n${message}`);
@@ -247,6 +249,15 @@ const App: React.FC = () => {
         await fetchData();
     } catch (error: any) {
         alert(`Erro ao adicionar clube: ${error.message}`);
+    }
+  };
+
+  const handleUpdateClubRegistrationStatus = async (championshipId: string, clubId: string, isPaid: boolean) => {
+    try {
+        await leagueService.updateClubRegistrationStatus(championshipId, clubId, isPaid);
+        await fetchData();
+    } catch (error) {
+        alert(`Erro ao atualizar status de pagamento: ${(error as Error).message}`);
     }
   };
 
@@ -530,6 +541,7 @@ const App: React.FC = () => {
                                                 onUpdateStaff={handleUpdateStaff}
                                                 onDeleteStaff={handleDeleteStaff}
                                                 onSaveFinancials={handleSaveChampionshipFinancials}
+                                                onUpdateClubRegistrationStatus={handleUpdateClubRegistrationStatus}
                                                />;
                 break;
 

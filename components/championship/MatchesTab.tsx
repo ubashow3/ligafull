@@ -115,7 +115,7 @@ const MatchesTab: React.FC<MatchesTabProps> = ({ matches, isAdminMode, onSelectM
                   <span className="font-bold text-sm sm:text-base text-white">{match.homeTeam.name}</span>
                 </div>
                 <div className="text-xl sm:text-2xl font-bold text-white text-center">
-                  {match.status === 'finished' ? `${match.homeScore} x ${match.awayScore}` : 'x'}
+                  {match.homeScore != null && match.awayScore != null ? `${match.homeScore} x ${match.awayScore}` : 'x'}
                 </div>
                 <div className="flex flex-col items-center text-center w-2/5">
                   <img src={match.awayTeam.logoUrl} alt={match.awayTeam.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full mb-2 object-cover" />
