@@ -10,7 +10,7 @@ interface ClubAdminPageProps {
   championship: Championship;
   club: Club;
   onUpdatePlayer: (clubId: string, updatedPlayer: Player) => void;
-  onCreatePlayer: (clubId: string, name: string, position: string, nickname: string, cpf: string, photoUrl: string) => void;
+  onCreatePlayer: (clubId: string, name: string, position: string, nickname: string, cpf: string, photoUrl: string, birthDate: string) => void;
   onDeletePlayer: (clubId: string, playerId: string) => void;
   onCreateStaff: (clubId: string, name: string, role: string) => void;
   onUpdateStaff: (clubId: string, updatedStaff: TechnicalStaff) => void;
@@ -62,6 +62,7 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
   const [newPlayerPosition, setNewPlayerPosition] = useState('');
   const [newPlayerNickname, setNewPlayerNickname] = useState('');
   const [newPlayerCpf, setNewPlayerCpf] = useState('');
+  const [newPlayerBirthDate, setNewPlayerBirthDate] = useState('');
   const [newPlayerPhotoFile, setNewPlayerPhotoFile] = useState<File | null>(null);
   const [newPlayerPhotoPreview, setNewPlayerPhotoPreview] = useState<string>('');
 
@@ -142,8 +143,8 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
         }
     }
 
-    onCreatePlayer(club.id, newPlayerName.trim(), newPlayerPosition.trim(), newPlayerNickname.trim(), newPlayerCpf.trim(), uploadedPhotoUrl);
-    setNewPlayerName(''); setNewPlayerPosition(''); setNewPlayerNickname(''); setNewPlayerCpf('');
+    onCreatePlayer(club.id, newPlayerName.trim(), newPlayerPosition.trim(), newPlayerNickname.trim(), newPlayerCpf.trim(), uploadedPhotoUrl, newPlayerBirthDate);
+    setNewPlayerName(''); setNewPlayerPosition(''); setNewPlayerNickname(''); setNewPlayerCpf(''); setNewPlayerBirthDate('');
     setNewPlayerPhotoFile(null); setNewPlayerPhotoPreview('');
     setShowAddPlayerForm(false);
   };
@@ -257,6 +258,7 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
                            <input type="text" value={newPlayerNickname} onChange={e => setNewPlayerNickname(e.target.value)} placeholder="Apelido" className="bg-gray-900 p-2 rounded w-full"/>
                            <input type="text" value={newPlayerCpf} onChange={e => setNewPlayerCpf(maskCPF(e.target.value))} placeholder="CPF" className="bg-gray-900 p-2 rounded w-full"/>
                         </div>
+                        <input type="date" value={newPlayerBirthDate} onChange={e => setNewPlayerBirthDate(e.target.value)} className="bg-gray-900 p-2 rounded w-full" placeholder="Data de Nascimento" />
                         <div className="flex items-center gap-4">
                             {newPlayerPhotoPreview ? <img src={newPlayerPhotoPreview} alt="Prévia" className="w-10 h-10 rounded-full object-cover"/> : <div className="w-10 h-10 rounded-full bg-gray-600"/>}
                             <input type="file" onChange={(e) => handleFileChange(e, setNewPlayerPhotoFile, setNewPlayerPhotoPreview)} accept="image/*" className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-green-600/20 file:text-green-300 hover:file:bg-green-600/30"/>
@@ -278,6 +280,7 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
                                  <input value={editingPlayer.nickname || ''} onChange={e => setEditingPlayer({...editingPlayer, nickname: e.target.value})} className="bg-gray-700 p-1 rounded w-full" placeholder="Apelido"/>
                                  <input value={editingPlayer.cpf || ''} onChange={e => setEditingPlayer({...editingPlayer, cpf: maskCPF(e.target.value)})} className="bg-gray-700 p-1 rounded w-full" placeholder="CPF"/>
                                </div>
+                               <input type="date" value={editingPlayer.birthDate?.split('T')[0] || ''} onChange={e => setEditingPlayer({...editingPlayer, birthDate: e.target.value})} className="bg-gray-700 p-1 rounded w-full" />
                                <div className="flex items-center gap-4">
                                    <img src={editingPlayerPhotoPreview || editingPlayer.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt="Prévia" className="w-10 h-10 rounded-full object-cover"/>
                                    <input type="file" onChange={(e) => handleFileChange(e, setEditingPlayerPhotoFile, setEditingPlayerPhotoPreview)} accept="image/*" className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-green-600/20 file:text-green-300 hover:file:bg-green-600/30"/>

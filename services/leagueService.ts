@@ -617,7 +617,7 @@ export const createPlayer = async (clubId: string, player: Omit<Player, 'id'>) =
         nickname,
         cpf,
         photo_url: photoUrl,
-        birth_date: birthDate,
+        birth_date: birthDate || null,
         goals_in_championship: goals,
     }).select();
     if (error) {
@@ -634,7 +634,7 @@ export const updatePlayer = async (player: Player) => {
         position, 
         cpf, 
         photo_url: photoUrl,
-        birth_date: birthDate 
+        birth_date: birthDate || null 
     }).eq('id', id);
     if (error) {
         console.error("Supabase updatePlayer error:", error);

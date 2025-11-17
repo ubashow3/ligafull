@@ -366,9 +366,9 @@ const App: React.FC = () => {
     }
   };
   
-  const handleCreatePlayer = async (clubId: string, name: string, position: string, nickname: string, cpf: string, photoUrl: string) => {
+  const handleCreatePlayer = async (clubId: string, name: string, position: string, nickname: string, cpf: string, photoUrl: string, birthDate: string) => {
     try {
-      await leagueService.createPlayer(clubId, { name: name.toUpperCase(), position, nickname, cpf, photoUrl, goals: 0 });
+      await leagueService.createPlayer(clubId, { name: name.toUpperCase(), position, nickname, cpf, photoUrl, birthDate, goals: 0 });
       await fetchData();
     } catch (error) {
       alert(`Erro ao criar jogador: ${(error as Error).message}`);

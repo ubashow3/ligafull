@@ -33,7 +33,7 @@ interface AdminChampionshipPageProps {
   onUpdateClubFinePaymentStatus: (championshipId: string, clubId: string, round: number, isPaid: boolean) => void;
   // Player props
   onUpdatePlayer: (clubId: string, updatedPlayer: Player) => void;
-  onCreatePlayer: (clubId: string, name: string, position: string, nickname: string, cpf: string, photoUrl: string) => void;
+  onCreatePlayer: (clubId: string, name: string, position: string, nickname: string, cpf: string, photoUrl: string, birthDate: string) => void;
   onDeletePlayer: (clubId: string, playerId: string) => void;
   // Staff props
   onCreateStaff: (clubId: string, name: string, role: string) => void;
