@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { League, Championship, Club, Player, TechnicalStaff, Match } from '../../types';
 import * as leagueService from '../../services/leagueService';
@@ -17,6 +18,58 @@ interface ClubAdminPageProps {
   onDeleteStaff: (clubId: string, staffId: string) => void;
   onUpdateClubDetails: (clubId: string, details: { name?: string; logoUrl?: string }) => void;
 }
+
+const getPlayerSuspensionDetails = (playerId: string, championship: Championship) => {
+    const playerEvents = championship.matches
+        .flatMap(match => match.events.map(event => ({ ...event, round: match.round, date: match.date })))
+        .filter(event => event.playerId === playerId && (event.type === 'yellow_card' || event.type === 'red_card'))
+        .sort((a, b) => (a.round as number) - (b.round as number) || new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    const cardHistory = playerEvents.map(event => ({
+        type: event.type,
+        date: event.date,
+        round: event.round,
+    }));
+
+    if (playerEvents.length === 0) {
+        return { isSuspended: false, suspensionRound: null, cardHistory: [] };
+    }
+
+    const rounds = [...new Set(championship.matches.map(m => m.round))].sort((a, b) => a - b);
+    let lastCompletedRound = 0;
+    for (const roundNum of rounds) {
+        const allMatchesInRound = championship.matches.filter(m => m.round === roundNum);
+        if (allMatchesInRound.length > 0 && allMatchesInRound.every(m => m.status === 'finished')) {
+            lastCompletedRound = roundNum;
+        } else {
+            break; 
+        }
+    }
+
+    let yellowCardCount = 0;
+    const triggeredSuspensionRounds = new Set<number>();
+
+    for (const event of playerEvents) {
+        if (event.type === 'red_card') {
+            triggeredSuspensionRounds.add((event.round as number) + 1);
+        } else if (event.type === 'yellow_card') {
+            yellowCardCount++;
+            if (yellowCardCount > 0 && yellowCardCount % 3 === 0) {
+                triggeredSuspensionRounds.add((event.round as number) + 1);
+            }
+        }
+    }
+    
+    const upcomingSuspensions = Array.from(triggeredSuspensionRounds)
+                                      .filter(round => round > lastCompletedRound)
+                                      .sort((a,b) => a-b);
+
+    if (upcomingSuspensions.length > 0) {
+        return { isSuspended: true, suspensionRound: upcomingSuspensions[0], cardHistory };
+    }
+
+    return { isSuspended: false, suspensionRound: null, cardHistory };
+};
 
 const PlusIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24" stroke="currentColor">
@@ -364,7 +417,7 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
                 <div className="relative group">
                     <img src={editingClubLogoPreview || club.logoUrl} alt={`${club.name} logo`} className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-4 border-gray-700"/>
                     <label htmlFor="club-logo-upload" className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-full cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                     </label>
                     <input id="club-logo-upload" type="file" className="hidden" accept="image/*" onChange={(e) => handleFileChange(e, setEditingClubLogoFile, setEditingClubLogoPreview)}/>
                 </div>
@@ -508,44 +561,67 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
                     </form>
                 )}
 
-                {club.players.map(player => (
-                    <div key={player.id} className="bg-gray-800 p-3 rounded-md">
-                        {editingPlayer?.id === player.id ? (
-                           <div className="flex-grow flex flex-col gap-2">
-                               <input value={editingPlayer.name} onChange={e => setEditingPlayer({...editingPlayer, name: e.target.value})} className="bg-gray-700 p-1 rounded uppercase" placeholder="Nome"/>
-                               <div className="flex gap-2">
-                                 <input value={editingPlayer.nickname || ''} onChange={e => setEditingPlayer({...editingPlayer, nickname: e.target.value})} className="bg-gray-700 p-1 rounded w-full" placeholder="Apelido"/>
-                                 <input value={editingPlayer.cpf || ''} onChange={e => setEditingPlayer({...editingPlayer, cpf: maskCPF(e.target.value)})} className="bg-gray-700 p-1 rounded w-full" placeholder="CPF"/>
+                {club.players.map(player => {
+                    const suspensionDetails = getPlayerSuspensionDetails(player.id, championship);
+                    return (
+                        <div key={player.id} className="bg-gray-800 p-3 rounded-md">
+                            {editingPlayer?.id === player.id ? (
+                               <div className="flex-grow flex flex-col gap-2">
+                                   <input value={editingPlayer.name} onChange={e => setEditingPlayer({...editingPlayer, name: e.target.value})} className="bg-gray-700 p-1 rounded uppercase" placeholder="Nome"/>
+                                   <div className="flex gap-2">
+                                     <input value={editingPlayer.nickname || ''} onChange={e => setEditingPlayer({...editingPlayer, nickname: e.target.value})} className="bg-gray-700 p-1 rounded w-full" placeholder="Apelido"/>
+                                     <input value={editingPlayer.cpf || ''} onChange={e => setEditingPlayer({...editingPlayer, cpf: maskCPF(e.target.value)})} className="bg-gray-700 p-1 rounded w-full" placeholder="CPF"/>
+                                   </div>
+                                   <input type="date" value={editingPlayer.birthDate?.split('T')[0] || ''} onChange={e => setEditingPlayer({...editingPlayer, birthDate: e.target.value})} className="bg-gray-700 p-1 rounded w-full" />
+                                   <div className="flex items-center gap-4">
+                                       <img src={editingPlayerPhotoPreview || editingPlayer.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt="Prévia" className="w-10 h-10 rounded-full object-cover"/>
+                                       <input type="file" onChange={(e) => handleFileChange(e, setEditingPlayerPhotoFile, setEditingPlayerPhotoPreview)} accept="image/*" className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-green-600/20 file:text-green-300 hover:file:bg-green-600/30"/>
+                                  </div>
+                                   <select value={editingPlayer.position} onChange={e => setEditingPlayer({...editingPlayer, position: e.target.value})} className="bg-gray-700 p-1 rounded">
+                                       {positions.map(pos => <option key={pos} value={pos}>{pos}</option>)}
+                                   </select>
+                                   <div className="flex justify-end gap-1"><button onClick={handleSavePlayer} className="text-green-400 px-2 py-1">Salvar</button><button onClick={() => setEditingPlayer(null)} className="text-gray-400 px-2 py-1">Cancelar</button></div>
                                </div>
-                               <input type="date" value={editingPlayer.birthDate?.split('T')[0] || ''} onChange={e => setEditingPlayer({...editingPlayer, birthDate: e.target.value})} className="bg-gray-700 p-1 rounded w-full" />
-                               <div className="flex items-center gap-4">
-                                   <img src={editingPlayerPhotoPreview || editingPlayer.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt="Prévia" className="w-10 h-10 rounded-full object-cover"/>
-                                   <input type="file" onChange={(e) => handleFileChange(e, setEditingPlayerPhotoFile, setEditingPlayerPhotoPreview)} accept="image/*" className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-green-600/20 file:text-green-300 hover:file:bg-green-600/30"/>
-                              </div>
-                               <select value={editingPlayer.position} onChange={e => setEditingPlayer({...editingPlayer, position: e.target.value})} className="bg-gray-700 p-1 rounded">
-                                   {positions.map(pos => <option key={pos} value={pos}>{pos}</option>)}
-                               </select>
-                               <div className="flex justify-end gap-1"><button onClick={handleSavePlayer} className="text-green-400 px-2 py-1">Salvar</button><button onClick={() => setEditingPlayer(null)} className="text-gray-400 px-2 py-1">Cancelar</button></div>
-                           </div>
-                        ) : (
-                           <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-3">
-                                    <img src={player.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt={player.name} className="w-10 h-10 rounded-full object-cover"/>
-                                    <div>
-                                        <p className="font-medium text-white">{player.nickname || player.name}</p>
-                                        <p className="text-sm text-gray-400">{player.position}</p>
+                            ) : (
+                                <div>
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-3">
+                                            <img src={player.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt={player.name} className="w-10 h-10 rounded-full object-cover"/>
+                                            <div>
+                                                <p className="font-medium text-white">{player.nickname || player.name}</p>
+                                                <p className="text-sm text-gray-400">{player.position}</p>
+                                            </div>
+                                        </div>
+                                        {!isRegistrationClosed && (
+                                            <div className="flex gap-2">
+                                                <button onClick={() => handleEditPlayer(player)} className="text-blue-400">Editar</button>
+                                                <button onClick={() => window.confirm('Tem certeza?') && onDeletePlayer(club.id, player.id)} className="text-red-500">Excluir</button>
+                                            </div>
+                                        )}
                                     </div>
+                                    {suspensionDetails.cardHistory.length > 0 && (
+                                        <div className="mt-2 pl-12">
+                                            {suspensionDetails.isSuspended && (
+                                                <span className="text-xs font-bold bg-red-600/50 text-red-300 px-2 py-0.5 rounded-full">
+                                                    SUSPENSO ({suspensionDetails.suspensionRound}ª Rodada)
+                                                </span>
+                                            )}
+                                            <ul className={`${suspensionDetails.isSuspended ? 'mt-2' : ''} space-y-1 text-xs text-gray-400`}>
+                                                {suspensionDetails.cardHistory.map((card, index) => (
+                                                    <li key={index} className="flex items-center gap-2">
+                                                    {card.type === 'yellow_card' ? <div className="w-2.5 h-3.5 bg-yellow-400 rounded-sm flex-shrink-0" /> : <div className="w-2.5 h-3.5 bg-red-600 rounded-sm flex-shrink-0" />}
+                                                    <span>{new Date(card.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
+                                                    <span>({card.round as number}ª Rodada)</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
                                 </div>
-                                {!isRegistrationClosed && (
-                                    <div className="flex gap-2">
-                                        <button onClick={() => handleEditPlayer(player)} className="text-blue-400">Editar</button>
-                                        <button onClick={() => window.confirm('Tem certeza?') && onDeletePlayer(club.id, player.id)} className="text-red-500">Excluir</button>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                ))}
+                            )}
+                        </div>
+                    );
+                })}
             </div>
         )}
 
