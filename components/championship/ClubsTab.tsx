@@ -303,17 +303,19 @@ const ClubsTab: React.FC<ClubsTabProps> = ({ clubs, championship, isAdminMode, o
                       {club.players.map(player => {
                         const suspensionDetails = getPlayerSuspensionDetails(player.id, championship);
                         return (
-                          <li key={player.id} className="py-2">
+                          <li key={player.id} className="py-2 flex flex-col">
                             <div className="flex items-center cursor-pointer hover:bg-gray-700/50 rounded-md -mx-2 px-2 py-1" onClick={() => onPlayerClick(player)}>
-                              <img src={player.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt={player.name} className="w-10 h-10 rounded-full mr-3 object-cover" />
+                              <img src={player.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt={player.name} className="w-8 h-8 rounded-full object-cover mr-3" />
                               <div>
-                                <p className="font-semibold text-white">{player.nickname || player.name}</p>
+                                <div>
+                                    <span className="font-medium text-white">{player.nickname || player.name}</span>
+                                    <span className="text-gray-400 text-xs ml-2">({player.position})</span>
+                                </div>
                                 {player.nickname && <p className="text-xs text-gray-400">{player.name}</p>}
-                                <p className="text-xs text-gray-400">{player.position}</p>
                               </div>
                             </div>
                              {suspensionDetails.cardHistory.length > 0 && (
-                                <div className="mt-2 pl-14">
+                                <div className="mt-2 pl-12">
                                     {suspensionDetails.isSuspended && (
                                         <span className="text-xs font-bold bg-red-600/50 text-red-300 px-2 py-0.5 rounded-full">
                                             SUSPENSO ({suspensionDetails.suspensionRound}ª Rodada)
