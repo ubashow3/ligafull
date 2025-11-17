@@ -451,10 +451,11 @@ export const addClubToChampionship = async (championshipId: string, clubData: { 
     if (linkError) throw linkError;
 };
 
-export const updateClubDetails = async (clubId: string, details: { name?: string; logoUrl?: string }) => {
-    const updateData: { name?: string; logo_url?: string } = {};
+export const updateClubDetails = async (clubId: string, details: { name?: string; logoUrl?: string; whatsapp?: string }) => {
+    const updateData: { name?: string; logo_url?: string; whatsapp?: string; } = {};
     if (details.name) updateData.name = details.name;
     if (details.logoUrl) updateData.logo_url = details.logoUrl;
+    if (details.whatsapp) updateData.whatsapp = details.whatsapp;
 
     if (Object.keys(updateData).length === 0) return; // No changes to save
 

@@ -289,7 +289,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleUpdateClubDetails = async (clubId: string, details: { name?: string, logoUrl?: string }) => {
+  const handleUpdateClubDetails = async (clubId: string, details: { name?: string, logoUrl?: string, whatsapp?: string }) => {
     try {
         await leagueService.updateClubDetails(clubId, details);
         await fetchData();
@@ -625,6 +625,7 @@ const App: React.FC = () => {
                                                     onSaveFinancials={handleSaveChampionshipFinancials}
                                                     onUpdateClubRegistrationStatus={handleUpdateClubRegistrationStatus}
                                                     onUpdateClubFinePaymentStatus={handleUpdateClubFinePaymentStatus}
+                                                    onUpdateClubDetails={handleUpdateClubDetails}
                                                    />;
                     break;
 
