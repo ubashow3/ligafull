@@ -1,6 +1,6 @@
 
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { League, Championship, Club, Player, TechnicalStaff } from '../../types';
 import * as leagueService from '../../services/leagueService';
 import AdminClubsTab from '../../components/admin/championship/AdminClubsTab'; // Re-using a good chunk of logic
@@ -75,6 +75,40 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
   const [showAddStaffForm, setShowAddStaffForm] = useState(false);
   const [newStaffName, setNewStaffName] = useState('');
   const [newStaffRole, setNewStaffRole] = useState('');
+
+  const [installPromptEvent, setInstallPromptEvent] = useState<any>(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPromptEvent(e);
+      if (!localStorage.getItem('ligaFullA2HSPrompted')) {
+        setShowInstallPrompt(true);
+      }
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    setShowInstallPrompt(false);
+    if (installPromptEvent) {
+        installPromptEvent.prompt();
+        const { outcome } = await installPromptEvent.userChoice;
+        console.log(`User response to the install prompt: ${outcome}`);
+    }
+    localStorage.setItem('ligaFullA2HSPrompted', 'true');
+  };
+
+  const handleDismissInstallClick = () => {
+    setShowInstallPrompt(false);
+    localStorage.setItem('ligaFullA2HSPrompted', 'true');
+  };
 
   const registrationDeadline = useMemo(() => {
     const deadlineStr = championship.financials?.playerRegistrationDeadline;
@@ -350,6 +384,22 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
                         )}
                     </div>
                  ))}
+            </div>
+        )}
+
+        {showInstallPrompt && installPromptEvent && (
+            <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 bg-gray-700 p-4 text-white flex items-center justify-between shadow-lg z-50 animate-fade-in-up rounded-lg max-w-md ml-auto">
+                <div className="flex items-center gap-4">
+                    <img src={league.logoUrl} alt="League Logo" className="w-10 h-10 rounded-full flex-shrink-0" />
+                    <div>
+                        <p className="font-bold">Acesso Rápido!</p>
+                        <p className="text-sm text-gray-300">Instale o app para facilitar o acesso.</p>
+                    </div>
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={handleDismissInstallClick} className="text-sm text-gray-400 hover:text-white px-3 py-1">Agora não</button>
+                    <button onClick={handleInstallClick} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg text-sm">Instalar</button>
+                </div>
             </div>
         )}
 
