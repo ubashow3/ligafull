@@ -127,6 +127,7 @@ const AdminChampionshipPage: React.FC<AdminChampionshipPageProps> = ({
                 onUpdateStaff={onUpdateStaff}
                 onDeleteStaff={onDeleteStaff}
                 onPlayerClick={setSelectedPlayer}
+                onSaveFinancials={onSaveFinancials}
                 onUpdateClubRegistrationStatus={onUpdateClubRegistrationStatus}
                 onUpdateClubFinePaymentStatus={onUpdateClubFinePaymentStatus}
             />

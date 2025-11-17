@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { Club, Player, TechnicalStaff, Championship, Match, ChampionshipFinancials } from '../../../types';
 import * as leagueService from '../../../services/leagueService';
@@ -267,6 +265,16 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
         }
     };
     onSaveFinancials(championship.id, updatedFinancials);
+  };
+
+  const handleCopyCredentials = (club: Club, password: string) => {
+    const textToCopy = `Acesso para ${club.name}:\n\nURL da Liga: ${leagueSlug}\nAbreviação do Clube: ${club.abbreviation}\nSenha: ${password}`;
+    navigator.clipboard.writeText(textToCopy).then(() => {
+        alert('Credenciais copiadas para a área de transferência!');
+    }, (err) => {
+        alert('Erro ao copiar credenciais. Por favor, copie manualmente.');
+        console.error('Could not copy text: ', err);
+    });
   };
 
   // Player Handlers
@@ -640,9 +648,14 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                             <div className="p-3 bg-gray-900/50 rounded-lg">
                                 <h5 className="font-semibold text-gray-300 mb-2">Acesso do Clube</h5>
                                 {clubPassword ? (
-                                    <div className="space-y-1 text-xs text-gray-400">
-                                        <p>Envie os dados abaixo para o responsável do clube:</p>
-                                        <div className="p-2 bg-gray-800 rounded-md">
+                                    <div className="space-y-2 text-xs text-gray-400">
+                                        <div className="flex justify-between items-center">
+                                            <p>Envie os dados abaixo para o responsável:</p>
+                                            <button onClick={() => handleCopyCredentials(club, clubPassword)} className="text-sm bg-gray-600 hover:bg-gray-500 text-blue-300 font-semibold py-1 px-2 rounded-md transition-colors">
+                                                Copiar
+                                            </button>
+                                        </div>
+                                        <div className="p-2 bg-gray-800 rounded-md space-y-1">
                                             <p><strong>URL da Liga:</strong> <code className="text-yellow-300">{leagueSlug}</code></p>
                                             <p><strong>Abreviação do Clube:</strong> <code className="text-yellow-300">{club.abbreviation}</code></p>
                                             <p><strong>Senha:</strong> <code className="text-yellow-300">{clubPassword}</code></p>
