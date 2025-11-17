@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import { League, Championship, Club, Player, TechnicalStaff } from '../../types';
 import * as leagueService from '../../services/leagueService';
@@ -14,6 +15,7 @@ interface ClubAdminPageProps {
   onCreateStaff: (clubId: string, name: string, role: string) => void;
   onUpdateStaff: (clubId: string, updatedStaff: TechnicalStaff) => void;
   onDeleteStaff: (clubId: string, staffId: string) => void;
+  onUpdateClubDetails: (clubId: string, details: { name?: string; logoUrl?: string }) => void;
 }
 
 const PlusIcon = () => (
@@ -42,10 +44,17 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
   onDeletePlayer,
   onCreateStaff,
   onUpdateStaff,
-  onDeleteStaff
+  onDeleteStaff,
+  onUpdateClubDetails
 }) => {
   const [activeTab, setActiveTab] = useState<'players' | 'staff'>('players');
   
+  // Club form state
+  const [isEditingClubInfo, setIsEditingClubInfo] = useState(false);
+  const [editingClubName, setEditingClubName] = useState(club.name);
+  const [editingClubLogoFile, setEditingClubLogoFile] = useState<File | null>(null);
+  const [editingClubLogoPreview, setEditingClubLogoPreview] = useState<string>(club.logoUrl);
+
   // Player form state
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [showAddPlayerForm, setShowAddPlayerForm] = useState(false);
@@ -87,6 +96,35 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
         setter(null);
         previewSetter('');
     }
+  };
+
+  // Club Handlers
+  const handleSaveClubInfo = async () => {
+    let uploadedLogoUrl: string | undefined = undefined;
+
+    if (editingClubLogoFile) {
+        try {
+            uploadedLogoUrl = await leagueService.uploadImage(editingClubLogoFile);
+        } catch (error) {
+            alert(`Erro ao fazer upload do logo: ${(error as Error).message}`);
+            return;
+        }
+    }
+
+    const detailsToUpdate: { name?: string; logoUrl?: string } = {};
+    if (editingClubName.trim() && editingClubName.trim() !== club.name) {
+        detailsToUpdate.name = editingClubName.trim();
+    }
+    if (uploadedLogoUrl) {
+        detailsToUpdate.logoUrl = uploadedLogoUrl;
+    }
+
+    if (Object.keys(detailsToUpdate).length > 0) {
+        onUpdateClubDetails(club.id, detailsToUpdate);
+    }
+    
+    setIsEditingClubInfo(false);
+    setEditingClubLogoFile(null);
   };
 
   // Player Handlers
@@ -154,12 +192,39 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
 
   return (
     <div className="animate-fade-in">
-        <div className="flex items-center mb-8">
-            <img src={club.logoUrl} alt={`${club.name} logo`} className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover mr-4 sm:mr-6 border-4 border-gray-700"/>
-            <div>
-                <h1 className="text-2xl md:text-3xl font-extrabold text-white">{club.name}</h1>
+        <div className="flex items-start mb-8 gap-4">
+            {isEditingClubInfo ? (
+                <div className="relative group">
+                    <img src={editingClubLogoPreview || club.logoUrl} alt={`${club.name} logo`} className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-4 border-gray-700"/>
+                    <label htmlFor="club-logo-upload" className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-full cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    </label>
+                    <input id="club-logo-upload" type="file" className="hidden" accept="image/*" onChange={(e) => handleFileChange(e, setEditingClubLogoFile, setEditingClubLogoPreview)}/>
+                </div>
+            ) : (
+                <img src={club.logoUrl} alt={`${club.name} logo`} className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-4 border-gray-700"/>
+            )}
+            <div className="flex-grow">
+                {isEditingClubInfo ? (
+                    <input 
+                        type="text" 
+                        value={editingClubName} 
+                        onChange={(e) => setEditingClubName(e.target.value)} 
+                        className="bg-gray-700 text-2xl md:text-3xl font-extrabold text-white p-2 rounded-lg w-full"
+                    />
+                ) : (
+                    <h1 className="text-2xl md:text-3xl font-extrabold text-white">{club.name}</h1>
+                )}
                 <p className="text-gray-400">Painel do Clube - {championship.name}</p>
             </div>
+             {isEditingClubInfo ? (
+                <div className="flex gap-2">
+                    <button onClick={handleSaveClubInfo} className="bg-green-600 hover:bg-green-700 text-white font-bold p-2 rounded-lg text-sm">Salvar</button>
+                    <button onClick={() => setIsEditingClubInfo(false)} className="text-gray-300 hover:text-white p-2 rounded-lg text-sm">Cancelar</button>
+                </div>
+            ) : (
+                <button onClick={() => { setIsEditingClubInfo(true); setEditingClubName(club.name); setEditingClubLogoPreview(club.logoUrl); }} className="bg-gray-700 hover:bg-gray-600 text-white font-bold p-2 rounded-lg text-sm">Editar</button>
+            )}
         </div>
 
         <div className="border-b border-gray-600 mb-6">

@@ -8,17 +8,56 @@ const generateSlug = (name: string) => {
   return name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
 };
 
+const resizeImage = (file: File, width: number, height: number): Promise<File> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = event => {
+            if (!event.target?.result) {
+                return reject(new Error("FileReader did not return a result."));
+            }
+            const img = new Image();
+            img.src = event.target.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    return reject(new Error('Could not get canvas context'));
+                }
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        return reject(new Error('Canvas to Blob conversion failed'));
+                    }
+                    const newFile = new File([blob], file.name, {
+                        type: 'image/jpeg', // Force jpeg for better compression
+                        lastModified: Date.now(),
+                    });
+                    resolve(newFile);
+                }, 'image/jpeg', 0.9); // 90% quality
+            };
+            img.onerror = error => reject(error);
+        };
+        reader.onerror = error => reject(error);
+    });
+};
+
+
 // Nova função para upload de imagem
 export const uploadImage = async (file: File): Promise<string> => {
     if (!file) return '';
+    
+    const resizedFile = await resizeImage(file, 100, 100);
 
-    const fileExt = file.name.split('.').pop();
+    const fileExt = resizedFile.name.split('.').pop() || 'jpg';
     const fileName = `${crypto.randomUUID()}.${fileExt}`;
     const filePath = `${fileName}`;
 
     const { error: uploadError } = await supabase.storage
         .from('images')
-        .upload(filePath, file);
+        .upload(filePath, resizedFile);
 
     if (uploadError) {
         console.error('Error uploading image:', uploadError);
@@ -410,6 +449,20 @@ export const addClubToChampionship = async (championshipId: string, clubData: { 
         club_id: newClub.id,
     });
     if (linkError) throw linkError;
+};
+
+export const updateClubDetails = async (clubId: string, details: { name?: string; logoUrl?: string }) => {
+    const updateData: { name?: string; logo_url?: string } = {};
+    if (details.name) updateData.name = details.name;
+    if (details.logoUrl) updateData.logo_url = details.logoUrl;
+
+    if (Object.keys(updateData).length === 0) return; // No changes to save
+
+    const { error } = await supabase.from('clubs').update(updateData).eq('id', clubId);
+    if (error) {
+        console.error("Supabase updateClubDetails error:", error);
+        throw new Error(`Falha ao atualizar detalhes do clube: ${error.message}`);
+    }
 };
 
 export const generateMatches = async (championshipId: string, matches: Match[]) => {

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { League, Championship, Club, Match, Player, TechnicalStaff, Official, ChampionshipWizardConfig, Standing, ChampionshipFinancials } from './types';
 import * as leagueService from './services/leagueService';
@@ -288,6 +289,22 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateClubDetails = async (clubId: string, details: { name?: string, logoUrl?: string }) => {
+    try {
+        await leagueService.updateClubDetails(clubId, details);
+        await fetchData();
+        // Also update the local state for immediate feedback if needed
+        if (adminClub && adminClub.club.id === clubId) {
+            setAdminClub(prev => prev ? ({
+                ...prev,
+                club: { ...prev.club, ...details }
+            }) : null);
+        }
+    } catch (error) {
+        alert(`Erro ao atualizar detalhes do clube: ${(error as Error).message}`);
+    }
+  };
+
   const handleUpdateClubRegistrationStatus = async (championshipId: string, clubId: string, isPaid: boolean) => {
     try {
         await leagueService.updateClubRegistrationStatus(championshipId, clubId, isPaid);
@@ -565,6 +582,7 @@ const App: React.FC = () => {
                             onCreateStaff={handleCreateStaff}
                             onUpdateStaff={handleUpdateStaff}
                             onDeleteStaff={handleDeleteStaff}
+                            onUpdateClubDetails={handleUpdateClubDetails}
                         />;
             }
         }
