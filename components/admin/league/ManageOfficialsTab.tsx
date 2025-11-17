@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Official } from '../../../types';
 
@@ -79,7 +80,7 @@ const ManageOfficialsTab: React.FC<ManageOfficialsTabProps> = ({ title, official
             {isFormVisible && (
                 <form onSubmit={handleSubmit} className="bg-gray-700/50 p-4 rounded-lg space-y-3 mb-6 animate-fade-in-down">
                     <h3 className="text-lg font-semibold text-white">{isEditing ? `Editar ${title}` : `Adicionar Novo(a) ${title}`}</h3>
-                    <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Nome Completo" required className="w-full bg-gray-800 border-gray-600 rounded p-2 text-white" />
+                    <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Nome Completo" required className="w-full bg-gray-800 border-gray-600 rounded p-2 text-white uppercase" />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <input type="text" name="nickname" value={formData.nickname || ''} onChange={handleChange} placeholder="Apelido (Opcional)" className="w-full bg-gray-800 border-gray-600 rounded p-2 text-white" />
                         <input type="text" name="cpf" value={formData.cpf || ''} onChange={handleChange} placeholder="CPF (Opcional)" className="w-full bg-gray-800 border-gray-600 rounded p-2 text-white" />

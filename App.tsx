@@ -1,5 +1,4 @@
 
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { League, Championship, Club, Match, Player, TechnicalStaff, Official, ChampionshipWizardConfig, Standing, ChampionshipFinancials } from './types';
 import * as leagueService from './services/leagueService';
@@ -323,7 +322,8 @@ const App: React.FC = () => {
   const handleCreateOfficial = async (type: 'referees' | 'tableOfficials', data: Omit<Official, 'id'>) => {
     if (!adminLeague) return;
     try {
-      await leagueService.createOfficial(adminLeague.id, type, data);
+      const upperCaseData = { ...data, name: data.name.toUpperCase() };
+      await leagueService.createOfficial(adminLeague.id, type, upperCaseData);
       await fetchData();
     } catch (error) {
       alert(`Erro ao criar oficial: ${(error as Error).message}`);
@@ -331,8 +331,9 @@ const App: React.FC = () => {
   };
   
   const handleUpdateOfficial = async (type: 'referees' | 'tableOfficials', data: Official) => {
-    try {
-      await leagueService.updateOfficial(data);
+     try {
+      const upperCaseData = { ...data, name: data.name.toUpperCase() };
+      await leagueService.updateOfficial(upperCaseData);
       await fetchData();
     } catch (error) {
       alert(`Erro ao atualizar oficial: ${(error as Error).message}`);
@@ -350,7 +351,7 @@ const App: React.FC = () => {
   
   const handleCreatePlayer = async (clubId: string, name: string, position: string, nickname: string, cpf: string, photoUrl: string) => {
     try {
-      await leagueService.createPlayer(clubId, { name, position, nickname, cpf, photoUrl, goals: 0 });
+      await leagueService.createPlayer(clubId, { name: name.toUpperCase(), position, nickname, cpf, photoUrl, goals: 0 });
       await fetchData();
     } catch (error) {
       alert(`Erro ao criar jogador: ${(error as Error).message}`);
@@ -359,7 +360,8 @@ const App: React.FC = () => {
 
   const handleUpdatePlayer = async (clubId: string, updatedPlayer: Player) => {
      try {
-      await leagueService.updatePlayer(updatedPlayer);
+      const upperCasePlayer = { ...updatedPlayer, name: updatedPlayer.name.toUpperCase() };
+      await leagueService.updatePlayer(upperCasePlayer);
       await fetchData();
     } catch (error) {
       alert(`Erro ao atualizar jogador: ${(error as Error).message}`);
@@ -377,7 +379,7 @@ const App: React.FC = () => {
 
   const handleCreateStaff = async (clubId: string, name: string, role: string) => {
      try {
-      await leagueService.createStaff(clubId, { name, role });
+      await leagueService.createStaff(clubId, { name: name.toUpperCase(), role });
       await fetchData();
     } catch (error) {
       alert(`Erro ao criar staff: ${(error as Error).message}`);
@@ -386,7 +388,8 @@ const App: React.FC = () => {
 
   const handleUpdateStaff = async (clubId: string, updatedStaff: TechnicalStaff) => {
      try {
-      await leagueService.updateStaff(updatedStaff);
+      const upperCaseStaff = { ...updatedStaff, name: updatedStaff.name.toUpperCase() };
+      await leagueService.updateStaff(upperCaseStaff);
       await fetchData();
     } catch (error) {
       alert(`Erro ao atualizar staff: ${(error as Error).message}`);

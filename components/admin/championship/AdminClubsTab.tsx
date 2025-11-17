@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Club, Player, TechnicalStaff, Championship, Match, ChampionshipFinancials } from '../../../types';
 import * as leagueService from '../../../services/leagueService';
@@ -511,7 +512,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                     </div>
                     {showAddPlayerFormForClub === club.id && (
                       <form onSubmit={(e) => handleAddPlayer(e, club.id)} className="space-y-2 p-2 bg-gray-700/50 rounded-md mb-2">
-                          <input type="text" value={newPlayerName} onChange={e => setNewPlayerName(e.target.value)} placeholder="Nome Completo" required className="bg-gray-900 p-1 rounded w-full text-sm"/>
+                          <input type="text" value={newPlayerName} onChange={e => setNewPlayerName(e.target.value)} placeholder="Nome Completo" required className="bg-gray-900 p-1 rounded w-full text-sm uppercase"/>
                           <div className="flex gap-2">
                              <input type="text" value={newPlayerNickname} onChange={e => setNewPlayerNickname(e.target.value)} placeholder="Apelido" className="bg-gray-900 p-1 rounded w-full text-sm"/>
                              <input type="text" value={newPlayerCpf} onChange={e => setNewPlayerCpf(maskCPF(e.target.value))} placeholder="CPF" className="bg-gray-900 p-1 rounded w-full text-sm"/>
@@ -534,7 +535,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                             <li key={player.id} className="py-2 flex flex-col">
                               {editingPlayer?.id === player.id ? (
                                 <div className="flex-grow flex flex-col gap-2 p-2 bg-gray-900/50 rounded-md">
-                                    <input value={editingPlayer.name} onChange={e => setEditingPlayer({...editingPlayer, name: e.target.value})} className="bg-gray-700 p-1 rounded text-sm" placeholder="Nome"/>
+                                    <input value={editingPlayer.name} onChange={e => setEditingPlayer({...editingPlayer, name: e.target.value})} className="bg-gray-700 p-1 rounded text-sm uppercase" placeholder="Nome"/>
                                     <div className="flex gap-2">
                                       <input value={editingPlayer.nickname || ''} onChange={e => setEditingPlayer({...editingPlayer, nickname: e.target.value})} className="bg-gray-700 p-1 rounded text-sm w-full" placeholder="Apelido"/>
                                       <input value={editingPlayer.cpf || ''} onChange={e => setEditingPlayer({...editingPlayer, cpf: maskCPF(e.target.value)})} className="bg-gray-700 p-1 rounded text-sm w-full" placeholder="CPF"/>
@@ -599,7 +600,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                     </div>
                      {showAddStaffFormForClub === club.id && (
                       <form onSubmit={(e) => handleAddStaff(e, club.id)} className="flex gap-2 items-center p-2 bg-gray-700/50 rounded-md mb-2">
-                          <input type="text" value={newStaffName} onChange={e => setNewStaffName(e.target.value)} placeholder="Nome" required className="bg-gray-900 p-1 rounded w-full text-sm"/>
+                          <input type="text" value={newStaffName} onChange={e => setNewStaffName(e.target.value)} placeholder="Nome" required className="bg-gray-900 p-1 rounded w-full text-sm uppercase"/>
                           <input type="text" value={newStaffRole} onChange={e => setNewStaffRole(e.target.value)} placeholder="Cargo" required className="bg-gray-900 p-1 rounded w-full text-sm"/>
                           <button type="submit" className="bg-blue-600 text-white px-2 py-1 rounded text-sm">Salvar</button>
                           <button type="button" onClick={() => setShowAddStaffFormForClub(null)} className="text-gray-400 text-lg">&times;</button>
@@ -610,7 +611,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                         <li key={staff.id} className="py-2 flex justify-between items-center">
                            {editingStaff?.id === staff.id ? (
                               <>
-                                  <input value={editingStaff.name} onChange={e => setEditingStaff({...editingStaff, name: e.target.value})} className="bg-gray-700 p-1 rounded w-2/5"/>
+                                  <input value={editingStaff.name} onChange={e => setEditingStaff({...editingStaff, name: e.target.value})} className="bg-gray-700 p-1 rounded w-2/5 uppercase"/>
                                   <input value={editingStaff.role} onChange={e => setEditingStaff({...editingStaff, role: e.target.value})} className="bg-gray-700 p-1 rounded w-2/5"/>
                                   <div className="flex gap-1"><button onClick={() => handleSaveStaff(club.id)} className="text-green-400 px-2">OK</button><button onClick={() => setEditingStaff(null)} className="text-gray-400">X</button></div>
                               </>
