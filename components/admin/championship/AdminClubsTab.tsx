@@ -266,7 +266,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
         alert("Dados financeiros do campeonato não encontrados.");
         return;
     }
-    const newToken = crypto.randomUUID();
+    const newToken = crypto.randomUUID().split('-')[0]; // Short, 8-char token
     const updatedFinancials: ChampionshipFinancials = {
         ...championship.financials,
         clubAdminTokens: {
