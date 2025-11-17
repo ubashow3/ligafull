@@ -103,6 +103,7 @@ const App: React.FC = () => {
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isAdminActionsModalOpen, setIsAdminActionsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [tokenChecked, setTokenChecked] = useState(false);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -146,6 +147,42 @@ const App: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, []);
+  
+  useEffect(() => {
+    if (!isLoading && leagues.length > 0 && !tokenChecked) {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+
+      if (token) {
+        let found = false;
+        for (const league of leagues) {
+          for (const championship of league.championships) {
+            const tokens = championship.financials?.clubAdminTokens;
+            if (tokens) {
+              const clubId = Object.keys(tokens).find(key => tokens[key] === token);
+              if (clubId) {
+                const club = championship.clubs.find(c => c.id === clubId);
+                if (club) {
+                  setIsAdminMode(true);
+                  setAdminClub({ league, championship, club });
+                  setView({ name: 'club_admin', leagueId: league.id, championshipId: championship.id, clubId: club.id });
+                  found = true;
+                  window.history.replaceState({}, document.title, window.location.pathname);
+                  break;
+                }
+              }
+            }
+          }
+          if (found) break;
+        }
+        if (!found) {
+            alert("Token de acesso inválido ou expirado.");
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }
+      setTokenChecked(true);
+    }
+  }, [isLoading, leagues, tokenChecked]);
 
   const processedLeagues = useMemo(() => {
     return leagues.map(league => ({
@@ -190,23 +227,6 @@ const App: React.FC = () => {
     } catch (error) {
        console.error("Login failed:", error);
        alert('Ocorreu um erro durante o login.');
-    }
-  };
-
-  const handleClubLogin = async (leagueSlug: string, clubAbbr: string, pass: string) => {
-    try {
-      const loggedInClubData = await leagueService.loginClubAdmin(leagueSlug, clubAbbr, pass);
-      if (loggedInClubData) {
-        setIsAdminMode(true); // Re-use isAdminMode for UI control
-        setAdminClub(loggedInClubData);
-        setView({ name: 'club_admin', leagueId: loggedInClubData.league.id, championshipId: loggedInClubData.championship.id, clubId: loggedInClubData.club.id });
-        setIsAdminModalOpen(false);
-      } else {
-        alert('Credenciais do clube inválidas.');
-      }
-    } catch (error) {
-      console.error("Club login failed:", error);
-      alert('Ocorreu um erro durante o login do clube.');
     }
   };
 
@@ -667,7 +687,6 @@ const App: React.FC = () => {
           setView({ name: 'create_league' });
         }}
         onLogin={handleLogin}
-        onClubLogin={handleClubLogin}
       />
       <AdminActionsModal
         isOpen={isAdminActionsModalOpen}

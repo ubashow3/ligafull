@@ -97,6 +97,13 @@ const PlusIcon = () => (
     </svg>
 );
 
+const WhatsAppIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.487 5.235 3.487 8.413 0 6.557-5.338 11.892-11.894 11.892-1.99 0-3.903-.51-5.633-1.447l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.447-4.435-9.884-9.888-9.884-5.448 0-9.886 4.434-9.889 9.884-.001 2.225.651 4.315 1.731 6.086l.099.197-.54 1.968 1.98- .529z" />
+    </svg>
+);
+
+
 const positions = ['Goleiro', 'Defensor', 'Lateral', 'Meio-campo', 'Volante', 'Ponta', 'Atacante'];
 
 
@@ -231,7 +238,10 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
 
   const handleAddClub = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newClubName.trim() || !newClubAbbr.trim()) return;
+    if (!newClubName.trim() || !newClubAbbr.trim() || !newClubWhatsapp.trim()) {
+        alert("Nome, Abreviação e WhatsApp são obrigatórios.");
+        return;
+    }
     
     let uploadedLogoUrl = '';
     if (newClubLogoFile) {
@@ -243,7 +253,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
         }
     }
 
-    const cleanWhatsapp = '+55' + newClubWhatsapp.replace(/\D/g, '');
+    const cleanWhatsapp = newClubWhatsapp.replace(/\D/g, '');
     onCreateClub(newClubName.trim(), newClubAbbr.trim().toUpperCase(), uploadedLogoUrl, cleanWhatsapp);
     
     setNewClubName(''); setNewClubAbbr(''); setNewClubWhatsapp('');
@@ -256,25 +266,27 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
         alert("Dados financeiros do campeonato não encontrados.");
         return;
     }
-    const newPassword = Math.random().toString(36).slice(-8);
+    const newToken = crypto.randomUUID();
     const updatedFinancials: ChampionshipFinancials = {
         ...championship.financials,
-        clubAdminCredentials: {
-            ...championship.financials.clubAdminCredentials,
-            [clubId]: newPassword
+        clubAdminTokens: {
+            ...championship.financials.clubAdminTokens,
+            [clubId]: newToken
         }
     };
     onSaveFinancials(championship.id, updatedFinancials);
   };
 
-  const handleCopyCredentials = (club: Club, password: string) => {
-    const textToCopy = `Acesso para ${club.name}:\n\nURL da Liga: ${leagueSlug}\nAbreviação do Clube: ${club.abbreviation}\nSenha: ${password}`;
-    navigator.clipboard.writeText(textToCopy).then(() => {
-        alert('Credenciais copiadas para a área de transferência!');
-    }, (err) => {
-        alert('Erro ao copiar credenciais. Por favor, copie manualmente.');
-        console.error('Could not copy text: ', err);
-    });
+  const handleSendWhatsapp = (club: Club, token: string) => {
+    if (!club.whatsapp) {
+      alert('Este clube não possui um número de WhatsApp cadastrado.');
+      return;
+    }
+    const magicLink = `${window.location.origin}${window.location.pathname}?token=${token}`;
+    const message = `Olá! Aqui está o seu link de acesso para gerenciar o ${club.name} no campeonato ${championship.name}:\n\n${magicLink}\n\nEste link é único, pessoal e intransferível.`;
+    const encodedMessage = encodeURIComponent(message);
+    const phoneNumber = club.whatsapp.replace(/\D/g, '');
+    window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
   };
 
   // Player Handlers
@@ -392,16 +404,14 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                 {newClubLogoPreview ? <img src={newClubLogoPreview} alt="Prévia" className="w-12 h-12 rounded-full object-cover"/> : <div className="w-12 h-12 rounded-full bg-gray-600"/>}
                 <input type="file" onChange={(e) => handleFileChange(e, setNewClubLogoFile, setNewClubLogoPreview)} accept="image/*" className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-600/20 file:text-green-300 hover:file:bg-green-600/30"/>
            </div>
-          <div className="relative">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 pointer-events-none">+55</span>
-            <input 
-              type="tel" 
-              value={newClubWhatsapp} 
-              onChange={(e) => setNewClubWhatsapp(maskPhone(e.target.value))} 
-              placeholder="(XX) XXXXX-XXXX" 
-              className="w-full bg-gray-800 border-gray-600 rounded p-2 pl-12 text-white"
-            />
-          </div>
+          <input 
+            type="tel" 
+            value={newClubWhatsapp} 
+            onChange={(e) => setNewClubWhatsapp(maskPhone(e.target.value))} 
+            placeholder="WhatsApp (XX) XXXXX-XXXX"
+            required
+            className="w-full bg-gray-800 border-gray-600 rounded p-2 text-white"
+          />
           <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowAddClubForm(false)} className="py-1 px-3 rounded text-gray-300 hover:text-white">Cancelar</button><button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded">Salvar</button></div>
         </form>
       )}
@@ -445,7 +455,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                 .reduce((acc, curr) => acc + curr.totalFine, 0);
 
             const totalDue = (isRegistrationPaid ? 0 : registrationFee) + unpaidFines;
-            const clubPassword = championship.financials?.clubAdminCredentials?.[club.id];
+            const clubToken = championship.financials?.clubAdminTokens?.[club.id];
 
             return (
             <div key={club.id} className="bg-gray-700/50 rounded-lg overflow-hidden">
@@ -645,26 +655,24 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                         </div>
 
                         {isRegistrationPaid && (
-                            <div className="p-3 bg-gray-900/50 rounded-lg">
+                           <div className="p-3 bg-gray-900/50 rounded-lg">
                                 <h5 className="font-semibold text-gray-300 mb-2">Acesso do Clube</h5>
-                                {clubPassword ? (
-                                    <div className="space-y-2 text-xs text-gray-400">
-                                        <div className="flex justify-between items-center">
-                                            <p>Envie os dados abaixo para o responsável:</p>
-                                            <button onClick={() => handleCopyCredentials(club, clubPassword)} className="text-sm bg-gray-600 hover:bg-gray-500 text-blue-300 font-semibold py-1 px-2 rounded-md transition-colors">
-                                                Copiar
-                                            </button>
-                                        </div>
-                                        <div className="p-2 bg-gray-800 rounded-md space-y-1">
-                                            <p><strong>URL da Liga:</strong> <code className="text-yellow-300">{leagueSlug}</code></p>
-                                            <p><strong>Abreviação do Clube:</strong> <code className="text-yellow-300">{club.abbreviation}</code></p>
-                                            <p><strong>Senha:</strong> <code className="text-yellow-300">{clubPassword}</code></p>
-                                        </div>
-                                    </div>
+                                {clubToken ? (
+                                    <button 
+                                        onClick={() => handleSendWhatsapp(club, clubToken)} 
+                                        disabled={!club.whatsapp}
+                                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-lg text-sm flex items-center justify-center gap-2 disabled:bg-gray-500 disabled:cursor-not-allowed"
+                                    >
+                                        <WhatsAppIcon />
+                                        Enviar Acesso via WhatsApp
+                                    </button>
                                 ) : (
                                     <button onClick={() => handleGenerateClubAccess(club.id)} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg text-sm">
-                                        Gerar Acesso para Clube
+                                        Gerar Link de Acesso
                                     </button>
+                                )}
+                                {!club.whatsapp && clubToken && (
+                                    <p className="text-xs text-red-400 mt-2 text-center">Cadastre o WhatsApp do clube para poder enviar o link.</p>
                                 )}
                             </div>
                         )}

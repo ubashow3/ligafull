@@ -90,7 +90,7 @@ export interface ChampionshipFinancials {
     clubPayments?: { [clubId:string]: boolean };
     finePayments?: { [clubId: string]: { [round: number]: boolean } };
     playerRegistrationDeadline?: string;
-    clubAdminCredentials?: { [clubId: string]: string };
+    clubAdminTokens?: { [clubId: string]: string };
 }
 
 export interface Championship {
