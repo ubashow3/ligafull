@@ -178,6 +178,8 @@ const transformLeagues = (data: any[]): League[] => {
                                 totalCost: Number(rawFinancials.totalCost) || 0, registrationFeePerClub: Number(rawFinancials.registrationFeePerClub) || 0,
                                 clubPayments: rawFinancials.clubPayments || {},
                                 finePayments: rawFinancials.finePayments || {},
+                                playerRegistrationDeadline: rawFinancials.playerRegistrationDeadline,
+                                clubAdminCredentials: rawFinancials.clubAdminCredentials || {},
                             };
                         }
                     } catch(e) { console.error("Error processing financials for championship, continuing without financials:", champData.id, e); financials = undefined; }
@@ -326,6 +328,39 @@ export const login = async (email: string, pass: string): Promise<League | null>
     if (error || !data) return null;
     const structuredData = structureChampionships([data]);
     return transformLeagues(structuredData)[0];
+};
+
+export const loginClubAdmin = async (leagueSlug: string, clubAbbr: string, pass: string): Promise<{ league: League, championship: Championship, club: Club } | null> => {
+    if (!leagueSlug || !clubAbbr || !pass) return null;
+    
+    const { data, error } = await supabase
+        .from('leagues')
+        .select(leagueQuery)
+        .eq('slug', leagueSlug)
+        .limit(1);
+
+    if (error || !data || data.length === 0) {
+        console.error('League not found or error:', error);
+        return null;
+    }
+
+    const structuredData = structureChampionships(data);
+    const transformedLeagues = transformLeagues(structuredData);
+    const league = transformedLeagues[0];
+
+    if (!league) return null;
+
+    for (const championship of league.championships) {
+        const club = championship.clubs.find(c => c.abbreviation.toUpperCase() === clubAbbr.toUpperCase());
+        if (club) {
+            const storedPassword = championship.financials?.clubAdminCredentials?.[club.id];
+            if (storedPassword && storedPassword === pass) {
+                return { league, championship, club };
+            }
+        }
+    }
+    
+    return null;
 };
 
 export const createLeague = async (leagueData: { name: string, logoUrl: string, adminEmail: string, adminPassword: string, state: string, city: string }): Promise<League> => {

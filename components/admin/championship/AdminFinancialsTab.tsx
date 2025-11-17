@@ -7,13 +7,15 @@ interface AdminFinancialsTabProps {
 }
 
 const AdminFinancialsTab: React.FC<AdminFinancialsTabProps> = ({ championship, onSave }) => {
-  const emptyForm: Omit<ChampionshipFinancials, 'registrationFeePerClub' | 'totalCost'> = {
+  const emptyForm: Omit<ChampionshipFinancials, 'totalCost'> = {
     refereeFee: 0,
     assistantFee: 0,
     tableOfficialFee: 0,
     fieldFee: 0,
     yellowCardFine: 0,
     redCardFine: 0,
+    registrationFeePerClub: 0,
+    playerRegistrationDeadline: undefined,
   };
 
   const [formState, setFormState] = useState(championship.financials || emptyForm);
@@ -37,7 +39,7 @@ const AdminFinancialsTab: React.FC<AdminFinancialsTabProps> = ({ championship, o
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormState(prev => ({ ...prev, [name]: parseFloat(value) || 0 }));
+    setFormState(prev => ({ ...prev, [name]: e.target.type === 'date' ? value : parseFloat(value) || 0 }));
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -53,7 +55,7 @@ const AdminFinancialsTab: React.FC<AdminFinancialsTabProps> = ({ championship, o
 
   return (
     <div className="animate-fade-in">
-        <h2 className="text-xl sm:text-2xl font-bold text-green-400 mb-4">Financeiro do Campeonato</h2>
+        <h2 className="text-xl sm:text-2xl font-bold text-green-400 mb-4">Financeiro e Configurações</h2>
         <div className="bg-gray-800 p-4 sm:p-6 rounded-lg">
              {!isReadyForFinancials && (
                 <div className="text-center p-4 border-2 border-dashed border-yellow-500/50 bg-yellow-500/10 text-yellow-300 rounded-lg">
@@ -118,6 +120,13 @@ const AdminFinancialsTab: React.FC<AdminFinancialsTabProps> = ({ championship, o
                         </div>
                     </div>
 
+                     <div>
+                        <h3 className="text-lg font-semibold text-white mb-2">Prazos e Regras</h3>
+                         <div>
+                           <label className="block text-sm font-medium text-gray-300 mb-1">Data Limite para Inscrição de Jogadores</label>
+                           <input type="date" name="playerRegistrationDeadline" value={formState.playerRegistrationDeadline || ''} onChange={handleChange} className="w-full bg-gray-700 border-gray-600 rounded p-2 text-white"/>
+                        </div>
+                    </div>
 
                     <div className="border-t border-gray-700 pt-4">
                         <h3 className="text-lg font-semibold text-white mb-2">Resumo do Campeonato</h3>

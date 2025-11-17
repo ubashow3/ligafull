@@ -1,7 +1,7 @@
 
 
 import React, { useState } from 'react';
-import { Club, Player, TechnicalStaff, Championship, Match } from '../../../types';
+import { Club, Player, TechnicalStaff, Championship, Match, ChampionshipFinancials } from '../../../types';
 import * as leagueService from '../../../services/leagueService';
 
 const maskCPF = (value: string) => {
@@ -80,6 +80,7 @@ interface AdminClubsTabProps {
   championshipId: string;
   onCreateClub: (name: string, abbreviation: string, logoUrl: string, whatsapp: string) => void;
   onPlayerClick: (player: Player) => void;
+  onSaveFinancials: (championshipId: string, financials: ChampionshipFinancials) => void;
   onUpdateClubRegistrationStatus: (championshipId: string, clubId: string, isPaid: boolean) => void;
   onUpdateClubFinePaymentStatus: (championshipId: string, clubId: string, round: number, isPaid: boolean) => void;
   // Player Props
@@ -160,6 +161,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
     championshipId,
     onCreateClub, 
     onPlayerClick,
+    onSaveFinancials,
     onUpdateClubRegistrationStatus,
     onUpdateClubFinePaymentStatus,
     onUpdatePlayer, 
@@ -249,6 +251,22 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
     setNewClubName(''); setNewClubAbbr(''); setNewClubWhatsapp('');
     setNewClubLogoFile(null); setNewClubLogoPreview('');
     setShowAddClubForm(false);
+  };
+
+  const handleGenerateClubAccess = (clubId: string) => {
+    if (!championship.financials) {
+        alert("Dados financeiros do campeonato não encontrados.");
+        return;
+    }
+    const newPassword = Math.random().toString(36).slice(-8);
+    const updatedFinancials: ChampionshipFinancials = {
+        ...championship.financials,
+        clubAdminCredentials: {
+            ...championship.financials.clubAdminCredentials,
+            [clubId]: newPassword
+        }
+    };
+    onSaveFinancials(championship.id, updatedFinancials);
   };
 
   // Player Handlers
@@ -419,7 +437,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                 .reduce((acc, curr) => acc + curr.totalFine, 0);
 
             const totalDue = (isRegistrationPaid ? 0 : registrationFee) + unpaidFines;
-
+            const clubPassword = championship.financials?.clubAdminCredentials?.[club.id];
 
             return (
             <div key={club.id} className="bg-gray-700/50 rounded-lg overflow-hidden">
@@ -617,6 +635,26 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                                 </label>
                             </div>
                         </div>
+
+                        {isRegistrationPaid && (
+                            <div className="p-3 bg-gray-900/50 rounded-lg">
+                                <h5 className="font-semibold text-gray-300 mb-2">Acesso do Clube</h5>
+                                {clubPassword ? (
+                                    <div className="space-y-1 text-xs text-gray-400">
+                                        <p>Envie os dados abaixo para o responsável do clube:</p>
+                                        <div className="p-2 bg-gray-800 rounded-md">
+                                            <p><strong>URL da Liga:</strong> <code className="text-yellow-300">{leagueSlug}</code></p>
+                                            <p><strong>Abreviação do Clube:</strong> <code className="text-yellow-300">{club.abbreviation}</code></p>
+                                            <p><strong>Senha:</strong> <code className="text-yellow-300">{clubPassword}</code></p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button onClick={() => handleGenerateClubAccess(club.id)} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg text-sm">
+                                        Gerar Acesso para Clube
+                                    </button>
+                                )}
+                            </div>
+                        )}
 
                         <div className="p-3 bg-gray-900/50 rounded-lg">
                             <p className="font-semibold text-gray-300 mb-2">Multas por Rodada</p>

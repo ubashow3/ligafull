@@ -17,6 +17,7 @@ import AdminLeaguePage from './pages/admin/AdminLeaguePage';
 import AdminChampionshipPage from './pages/admin/AdminChampionshipPage';
 import AdminMatchSummaryPage from './pages/admin/AdminMatchSummaryPage';
 import CreateMatchesPage from './pages/admin/CreateMatchesPage';
+import ClubAdminPage from './pages/admin/ClubAdminPage';
 
 // Helper function to calculate standings (remains client-side)
 const calculateStandings = (clubs: Club[], matches: Match[]): Standing[] => {
@@ -89,13 +90,15 @@ type View =
   | { name: 'admin_league'; leagueId: string }
   | { name: 'admin_championship'; leagueId: string; championshipId: string }
   | { name: 'admin_match'; leagueId: string; championshipId: string; matchId: string }
-  | { name: 'create_matches'; leagueId: string; championshipId: string };
+  | { name: 'create_matches'; leagueId: string; championshipId: string }
+  | { name: 'club_admin'; leagueId: string; championshipId: string; clubId: string };
 
 const App: React.FC = () => {
   const [leagues, setLeagues] = useState<League[]>([]);
   const [view, setView] = useState<View>({ name: 'home' });
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [adminLeague, setAdminLeague] = useState<League | null>(null);
+  const [adminClub, setAdminClub] = useState<{ league: League; championship: Championship; club: Club; } | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isAdminActionsModalOpen, setIsAdminActionsModalOpen] = useState(false);
@@ -160,7 +163,7 @@ const App: React.FC = () => {
   }, [processedLeagues, view]);
 
   const currentChampionship = useMemo(() => {
-    if (view.name !== 'championship' && view.name !== 'match' && view.name !== 'admin_championship' && view.name !== 'admin_match' && view.name !== 'create_matches') return null;
+    if (view.name !== 'championship' && view.name !== 'match' && view.name !== 'admin_championship' && view.name !== 'admin_match' && view.name !== 'create_matches' && view.name !== 'club_admin') return null;
     return currentLeague?.championships.find(c => c.id === view.championshipId) || null;
   }, [currentLeague, view]);
 
@@ -179,8 +182,6 @@ const App: React.FC = () => {
         setAdminLeague(loggedInLeague);
         setView({ name: 'admin_league', leagueId: loggedInLeague.id });
         setIsAdminModalOpen(false);
-        // We need to refetch to ensure we have the adminPassword hash if needed later
-        // or just add it to the returned object from login service
         const fullLeagueData = leagues.find(l => l.id === loggedInLeague.id) || loggedInLeague;
         setAdminLeague(fullLeagueData);
       } else {
@@ -192,9 +193,27 @@ const App: React.FC = () => {
     }
   };
 
+  const handleClubLogin = async (leagueSlug: string, clubAbbr: string, pass: string) => {
+    try {
+      const loggedInClubData = await leagueService.loginClubAdmin(leagueSlug, clubAbbr, pass);
+      if (loggedInClubData) {
+        setIsAdminMode(true); // Re-use isAdminMode for UI control
+        setAdminClub(loggedInClubData);
+        setView({ name: 'club_admin', leagueId: loggedInClubData.league.id, championshipId: loggedInClubData.championship.id, clubId: loggedInClubData.club.id });
+        setIsAdminModalOpen(false);
+      } else {
+        alert('Credenciais do clube inválidas.');
+      }
+    } catch (error) {
+      console.error("Club login failed:", error);
+      alert('Ocorreu um erro durante o login do clube.');
+    }
+  };
+
   const handleLogout = () => {
     setIsAdminMode(false);
     setAdminLeague(null);
+    setAdminClub(null);
     setView({ name: 'home' });
     setIsAdminActionsModalOpen(false);
   };
@@ -204,15 +223,13 @@ const App: React.FC = () => {
     try {
       await leagueService.createLeague({ name, logoUrl, adminEmail: email, adminPassword: password, state, city });
       
-      // After creating, immediately log in and redirect to admin panel
       const loggedInLeague = await leagueService.login(email, password);
       if (loggedInLeague) {
-        await fetchData(); // Refresh all league data
+        await fetchData(); 
         setIsAdminMode(true);
         setAdminLeague(loggedInLeague);
         setView({ name: 'admin_league', leagueId: loggedInLeague.id });
       } else {
-        // Fallback in case login fails for some reason
         await fetchData();
         setView({ name: 'home' });
         alert('Liga criada com sucesso! Faça o login para administrar.');
@@ -236,7 +253,7 @@ const App: React.FC = () => {
   const handleSaveChampionshipFinancials = async (championshipId: string, financials: ChampionshipFinancials) => {
     try {
       await leagueService.saveChampionshipFinancials(championshipId, financials);
-      await fetchData(); // Refresh data
+      await fetchData();
     } catch (error) {
       alert(`Erro ao salvar dados financeiros: ${(error as Error).message}`);
     }
@@ -271,9 +288,11 @@ const App: React.FC = () => {
   };
 
   const onUpdateMatch = async (updatedMatch: Match) => {
-    if (!adminLeague) return;
+    if (!adminLeague && !adminClub) return;
     try {
-      await leagueService.updateMatch(updatedMatch, adminLeague);
+      const leagueForUpdate = adminLeague || adminClub?.league;
+      if (!leagueForUpdate) throw new Error("League context not found for match update.");
+      await leagueService.updateMatch(updatedMatch, leagueForUpdate);
       await fetchData();
     } catch (error) {
       console.error("Failed to update match", error);
@@ -377,7 +396,6 @@ const App: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // 1. Create a mutable copy of clubs and handle odd numbers with a bye
       let clubs = [...championship.clubs];
       const byeClub: Club = { id: 'bye', name: 'BYE', abbreviation: 'BYE', logoUrl: '', players: [], technicalStaff: [] };
       if (clubs.length % 2 !== 0) {
@@ -390,16 +408,14 @@ const App: React.FC = () => {
       const matchesPerRound = numTeams / 2;
       const startDate = new Date();
 
-      // 2. Generate Round Robin pairings for the first turn
       for (let round = 0; round < numRounds; round++) {
         for (let i = 0; i < matchesPerRound; i++) {
           const home = clubs[i];
           const away = clubs[numTeams - 1 - i];
 
-          // Don't create a match for a "bye" team
           if (home.id !== 'bye' && away.id !== 'bye') {
             const matchDate = new Date(startDate);
-            matchDate.setDate(startDate.getDate() + (round * 7)); // Simple weekly rounds
+            matchDate.setDate(startDate.getDate() + (round * 7));
             matchDate.setHours(16, 0, 0, 0);
 
             generatedMatches.push({
@@ -417,16 +433,14 @@ const App: React.FC = () => {
             });
           }
         }
-        // Rotate teams for the next round, keeping the first team fixed
         const lastTeam = clubs.pop()!;
         clubs.splice(1, 0, lastTeam);
       }
 
-      // 3. Handle second turn (return matches) if configured
       if (config.turns === 2) {
         const returnMatches = generatedMatches.map(match => {
            const returnDate = new Date(match.date);
-           returnDate.setDate(returnDate.getDate() + (numRounds + 1) * 7); // Offset for the second half
+           returnDate.setDate(returnDate.getDate() + (numRounds + 1) * 7);
            return {
               ...match,
               id: crypto.randomUUID(),
@@ -439,7 +453,6 @@ const App: React.FC = () => {
         generatedMatches.push(...returnMatches);
       }
       
-      // 4. Handle Playoffs (Mata-Mata)
       if (config.playoffs) {
           const totalQualifiers = config.format === 'ROUND_ROBIN' 
               ? config.playoffTeamsPerGroup 
@@ -472,20 +485,20 @@ const App: React.FC = () => {
 
           const playoffPromises: Promise<Match>[] = [];
 
-          if (totalQualifiers >= 8) { // Quarter-finals
+          if (totalQualifiers >= 8) { 
               lastRound++;
               playoffPromises.push(createPlayoffMatch(lastRound, '1º Colocado', '8º Colocado'));
               playoffPromises.push(createPlayoffMatch(lastRound, '2º Colocado', '7º Colocado'));
               playoffPromises.push(createPlayoffMatch(lastRound, '3º Colocado', '6º Colocado'));
               playoffPromises.push(createPlayoffMatch(lastRound, '4º Colocado', '5º Colocado'));
           }
-          if (totalQualifiers >= 4) { // Semi-finals
+          if (totalQualifiers >= 4) { 
               lastRound++;
               const qfPrefix = totalQualifiers >= 8 ? "QF" : "Colocado";
               playoffPromises.push(createPlayoffMatch(lastRound, `Vencedor ${qfPrefix} 1`, `Vencedor ${qfPrefix} 4`));
               playoffPromises.push(createPlayoffMatch(lastRound, `Vencedor ${qfPrefix} 2`, `Vencedor ${qfPrefix} 3`));
           }
-          if (totalQualifiers >= 2) { // Final
+          if (totalQualifiers >= 2) { 
               lastRound++;
               playoffPromises.push(createPlayoffMatch(lastRound, 'Vencedor SF 1', 'Vencedor SF 2'));
           }
@@ -494,10 +507,7 @@ const App: React.FC = () => {
           generatedMatches.push(...playoffMatches);
       }
 
-      // 5. Call the service to save the matches
       await leagueService.generateMatches(championship.id, generatedMatches);
-      
-      // 6. Refresh data and navigate back
       await fetchData();
       setView({ name: 'admin_championship', leagueId: view.leagueId, championshipId: championship.id });
 
@@ -514,67 +524,90 @@ const App: React.FC = () => {
   const renderContent = () => {
     if (isLoading) return <div className="text-center py-20">Carregando...</div>;
     
-    if (isAdminMode && adminLeague) {
-        const adminLeagueData = processedLeagues.find(l => l.id === adminLeague.id);
-        if (!adminLeagueData) {
-            handleLogout();
-            return <p>Erro ao carregar dados do administrador.</p>;
+    if (isAdminMode && (adminLeague || adminClub)) {
+        if (adminClub) {
+            const { league, championship, club } = adminClub;
+            const fullLeagueData = processedLeagues.find(l => l.id === league.id);
+            const fullChampionshipData = fullLeagueData?.championships.find(c => c.id === championship.id);
+            const fullClubData = fullChampionshipData?.clubs.find(c => c.id === club.id);
+
+            if (view.name === 'club_admin' && fullLeagueData && fullChampionshipData && fullClubData) {
+                return <ClubAdminPage 
+                            league={fullLeagueData}
+                            championship={fullChampionshipData}
+                            club={fullClubData}
+                            onCreatePlayer={handleCreatePlayer}
+                            onUpdatePlayer={handleUpdatePlayer}
+                            onDeletePlayer={handleDeletePlayer}
+                            onCreateStaff={handleCreateStaff}
+                            onUpdateStaff={handleUpdateStaff}
+                            onDeleteStaff={handleDeleteStaff}
+                        />;
+            }
         }
         
-        switch (view.name) {
-            case 'admin_league':
-                return <AdminLeaguePage 
-                            league={adminLeagueData} 
-                            onSelectChampionship={champ => setView({name: 'admin_championship', leagueId: adminLeagueData.id, championshipId: champ.id})} 
-                            onCreateChampionship={handleCreateChampionship}
-                            onCreateOfficial={handleCreateOfficial}
-                            onUpdateOfficial={handleUpdateOfficial}
-                            onDeleteOfficial={handleDeleteOfficial}
-                       />;
+        if (adminLeague) {
+            const adminLeagueData = processedLeagues.find(l => l.id === adminLeague.id);
+            if (!adminLeagueData) {
+                handleLogout();
+                return <p>Erro ao carregar dados do administrador.</p>;
+            }
+            
+            switch (view.name) {
+                case 'admin_league':
+                    return <AdminLeaguePage 
+                                league={adminLeagueData} 
+                                onSelectChampionship={champ => setView({name: 'admin_championship', leagueId: adminLeagueData.id, championshipId: champ.id})} 
+                                onCreateChampionship={handleCreateChampionship}
+                                onCreateOfficial={handleCreateOfficial}
+                                onUpdateOfficial={handleUpdateOfficial}
+                                onDeleteOfficial={handleDeleteOfficial}
+                           />;
 
-            case 'admin_championship':
-                const adminChampionship = adminLeagueData.championships.find(c => c.id === view.championshipId);
-                if (adminChampionship) return <AdminChampionshipPage 
-                                                championship={adminChampionship} 
-                                                league={adminLeagueData} 
-                                                onBack={() => setView({name: 'admin_league', leagueId: adminLeagueData.id})} 
-                                                onSelectMatch={match => setView({name: 'admin_match', leagueId: adminLeagueData.id, championshipId: adminChampionship.id, matchId: match.id})} 
-                                                onCreateClub={handleCreateClub} 
-                                                onGenerateMatches={handleGenerateMatches}
-                                                onUpdateMatch={onUpdateMatch} 
-                                                onNavigateToCreateMatches={() => setView({name: 'create_matches', leagueId: adminLeagueData.id, championshipId: adminChampionship.id})} 
-                                                onCreatePlayer={handleCreatePlayer}
-                                                onUpdatePlayer={handleUpdatePlayer}
-                                                onDeletePlayer={handleDeletePlayer}
-                                                onCreateStaff={handleCreateStaff}
-                                                onUpdateStaff={handleUpdateStaff}
-                                                onDeleteStaff={handleDeleteStaff}
-                                                onSaveFinancials={handleSaveChampionshipFinancials}
-                                                onUpdateClubRegistrationStatus={handleUpdateClubRegistrationStatus}
-                                                onUpdateClubFinePaymentStatus={handleUpdateClubFinePaymentStatus}
-                                               />;
-                break;
+                case 'admin_championship':
+                    const adminChampionship = adminLeagueData.championships.find(c => c.id === view.championshipId);
+                    if (adminChampionship) return <AdminChampionshipPage 
+                                                    championship={adminChampionship} 
+                                                    league={adminLeagueData} 
+                                                    onBack={() => setView({name: 'admin_league', leagueId: adminLeagueData.id})} 
+                                                    onSelectMatch={match => setView({name: 'admin_match', leagueId: adminLeagueData.id, championshipId: adminChampionship.id, matchId: match.id})} 
+                                                    onCreateClub={handleCreateClub} 
+                                                    onGenerateMatches={handleGenerateMatches}
+                                                    onUpdateMatch={onUpdateMatch} 
+                                                    onNavigateToCreateMatches={() => setView({name: 'create_matches', leagueId: adminLeagueData.id, championshipId: adminChampionship.id})} 
+                                                    onCreatePlayer={handleCreatePlayer}
+                                                    onUpdatePlayer={handleUpdatePlayer}
+                                                    onDeletePlayer={handleDeletePlayer}
+                                                    onCreateStaff={handleCreateStaff}
+                                                    onUpdateStaff={handleUpdateStaff}
+                                                    onDeleteStaff={handleDeleteStaff}
+                                                    onSaveFinancials={handleSaveChampionshipFinancials}
+                                                    onUpdateClubRegistrationStatus={handleUpdateClubRegistrationStatus}
+                                                    onUpdateClubFinePaymentStatus={handleUpdateClubFinePaymentStatus}
+                                                   />;
+                    break;
 
-            case 'admin_match':
-                const champForMatch = adminLeagueData.championships.find(c => view.name === 'admin_match' && c.id === view.championshipId);
-                const adminMatch = champForMatch?.matches.find(m => m.id === view.matchId);
-                if (adminMatch && champForMatch) return <AdminMatchSummaryPage 
-                                                            match={adminMatch} 
-                                                            league={adminLeagueData} 
-                                                            championship={champForMatch}
-                                                            onBack={() => setView({name: 'admin_championship', leagueId: adminLeagueData.id, championshipId: champForMatch.id})} 
-                                                            onUpdateMatch={onUpdateMatch} 
-                                                        />;
-                break;
-                
-            case 'create_matches':
-                 const champForCreation = adminLeagueData.championships.find(c => c.id === view.championshipId);
-                 if (champForCreation) return <CreateMatchesPage 
-                                                 championship={champForCreation} 
-                                                 onBack={() => setView({name: 'admin_championship', leagueId: adminLeagueData.id, championshipId: champForCreation.id})} 
-                                                 onGenerateMatches={handleGenerateMatches}
-                                              />
-                break;
+                case 'admin_match':
+                    const champForMatch = adminLeagueData.championships.find(c => view.name === 'admin_match' && c.id === view.championshipId);
+                    const adminMatch = champForMatch?.matches.find(m => m.id === view.matchId);
+                    if (adminMatch && champForMatch) return <AdminMatchSummaryPage 
+                                                                match={adminMatch} 
+                                                                league={adminLeagueData} 
+                                                                championship={champForMatch}
+                                                                onBack={() => setView({name: 'admin_championship', leagueId: adminLeagueData.id, championshipId: champForMatch.id})} 
+                                                                onUpdateMatch={onUpdateMatch} 
+                                                            />;
+                    break;
+                    
+                case 'create_matches':
+                     const champForCreation = adminLeagueData.championships.find(c => c.id === view.championshipId);
+                     if (champForCreation) return <CreateMatchesPage 
+                                                     championship={champForCreation} 
+                                                     onBack={() => setView({name: 'admin_championship', leagueId: adminLeagueData.id, championshipId: champForCreation.id})} 
+                                                     onGenerateMatches={handleGenerateMatches}
+                                                  />
+                    break;
+            }
         }
     }
     
@@ -601,7 +634,7 @@ const App: React.FC = () => {
       <Header
         onTitleClick={() => {
           if (isAdminMode) {
-              handleLogout(); // Always log out if in admin mode
+              handleLogout();
           } else {
              setView({ name: 'home' });
           }
@@ -634,6 +667,7 @@ const App: React.FC = () => {
           setView({ name: 'create_league' });
         }}
         onLogin={handleLogin}
+        onClubLogin={handleClubLogin}
       />
       <AdminActionsModal
         isOpen={isAdminActionsModalOpen}
