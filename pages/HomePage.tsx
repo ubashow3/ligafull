@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { League } from '../types';
 
@@ -71,7 +69,7 @@ const HomePage: React.FC<HomePageProps> = ({ leagues, onSelectLeague }) => {
   return (
     <div className="animate-fade-in">
       <div className="text-center mb-12">
-        <h1 className="text-4xl md:text-5xl font-extrabold text-green-400">Bem-vindo ao Liga Full</h1>
+        <h1 className="text-4xl md:text-5xl font-extrabold text-green-400">Bem-vindo ao LigaFull futebol digital</h1>
         <p className="mt-2 text-lg text-gray-300">Sua plataforma para gerenciamento de campeonatos de futebol.</p>
       </div>
 
