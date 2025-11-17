@@ -1,9 +1,9 @@
 
 
+
 import React, { useState, useMemo, useEffect } from 'react';
-import { League, Championship, Club, Player, TechnicalStaff } from '../../types';
+import { League, Championship, Club, Player, TechnicalStaff, Match } from '../../types';
 import * as leagueService from '../../services/leagueService';
-import AdminClubsTab from '../../components/admin/championship/AdminClubsTab'; // Re-using a good chunk of logic
 
 interface ClubAdminPageProps {
   league: League;
@@ -34,6 +34,91 @@ const maskCPF = (value: string) => {
 };
 
 const positions = ['Goleiro', 'Defensor', 'Lateral', 'Meio-campo', 'Volante', 'Ponta', 'Atacante'];
+
+const ResultDot: React.FC<{result: 'W' | 'D' | 'L'}> = ({ result }) => {
+    const style = {
+        'W': { color: 'bg-green-500', title: 'Vitória' },
+        'D': { color: 'bg-yellow-500', title: 'Empate' },
+        'L': { color: 'bg-red-500', title: 'Derrota' }
+    };
+    return <span className={`block w-4 h-4 rounded-full ${style[result].color}`} title={style[result].title}></span>;
+}
+
+const MatchResultDisplay: React.FC<{match: Match}> = ({ match }) => (
+    <div className="flex items-center justify-center gap-2 text-sm">
+        <img src={match.homeTeam.logoUrl} alt={match.homeTeam.name} className="w-5 h-5 rounded-full object-cover"/>
+        <span className="font-semibold">{match.homeTeam.abbreviation}</span>
+        <span className="font-bold text-white">{match.homeScore} x {match.awayScore}</span>
+        <span className="font-semibold">{match.awayTeam.abbreviation}</span>
+        <img src={match.awayTeam.logoUrl} alt={match.awayTeam.name} className="w-5 h-5 rounded-full object-cover"/>
+    </div>
+);
+
+const NextMatchDisplay: React.FC<{match: Match}> = ({ match }) => (
+    <div className="flex flex-col items-center text-sm">
+         <div className="flex items-center justify-center gap-2">
+            <img src={match.homeTeam.logoUrl} alt={match.homeTeam.name} className="w-5 h-5 rounded-full object-cover"/>
+            <span className="font-semibold">{match.homeTeam.abbreviation}</span>
+            <span className="font-bold text-white">vs</span>
+            <span className="font-semibold">{match.awayTeam.abbreviation}</span>
+            <img src={match.awayTeam.logoUrl} alt={match.awayTeam.name} className="w-5 h-5 rounded-full object-cover"/>
+        </div>
+        <span className="text-xs text-gray-400 mt-1">{new Date(match.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', weekday: 'short' })}</span>
+    </div>
+);
+
+interface CollapsibleSectionProps {
+    title: string;
+    children: React.ReactNode;
+    isOpen: boolean;
+    onToggle: () => void;
+}
+
+const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, children, isOpen, onToggle }) => (
+    <div className="p-4 bg-gray-900/50 rounded-lg">
+        <div className="flex justify-between items-center cursor-pointer" onClick={onToggle}>
+            <h4 className="font-bold text-green-400 text-base">{title}</h4>
+            <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+        </div>
+        {isOpen && <div className="mt-3 animate-fade-in">{children}</div>}
+    </div>
+);
+
+const getClubFinesByRound = (club: Club, championship: Championship) => {
+    const yellowFine = championship.financials?.yellowCardFine || 0;
+    const redFine = championship.financials?.redCardFine || 0;
+    const playerIds = new Set(club.players.map(p => p.id));
+    
+    const finesByRound: { [round: number]: { totalFine: number; cards: any[] } } = {};
+
+    championship.matches.forEach(match => {
+        if (match.status === 'finished' || match.status === 'in_progress') {
+             match.events.forEach(event => {
+                if (playerIds.has(event.playerId)) {
+                    if (event.type === 'yellow_card' || event.type === 'red_card') {
+                        if (!finesByRound[match.round]) {
+                            finesByRound[match.round] = { totalFine: 0, cards: [] };
+                        }
+                        const fine = event.type === 'yellow_card' ? yellowFine : redFine;
+                        finesByRound[match.round].totalFine += fine;
+                        finesByRound[match.round].cards.push({
+                            ...event,
+                            fine,
+                            date: match.date
+                        });
+                    }
+                }
+            });
+        }
+    });
+
+    return Object.entries(finesByRound).map(([round, data]) => ({
+        round: parseInt(round, 10),
+        ...data
+    })).sort((a, b) => a.round - b.round);
+};
 
 const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
   league,
@@ -78,6 +163,15 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
 
   const [installPromptEvent, setInstallPromptEvent] = useState<any>(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+
+  const [openSections, setOpenSections] = useState({
+    performance: true,
+    financials: true,
+  });
+
+  const toggleSection = (section: keyof typeof openSections) => {
+    setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
   
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -113,14 +207,55 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
   const registrationDeadline = useMemo(() => {
     const deadlineStr = championship.financials?.playerRegistrationDeadline;
     if (!deadlineStr) return null;
-    // The input type="date" returns YYYY-MM-DD. To compare correctly, 
-    // we need to set the time to the end of that day.
     const deadline = new Date(deadlineStr);
     deadline.setHours(23, 59, 59, 999);
     return deadline;
   }, [championship]);
 
   const isRegistrationClosed = registrationDeadline ? new Date() > registrationDeadline : false;
+  
+  const performanceData = useMemo(() => {
+    const standing = championship.standings.find(s => s.clubId === club.id);
+    const standingPosition = standing ? championship.standings.indexOf(standing) + 1 : null;
+
+    const finishedMatches = championship.matches
+        .filter(m => m.status === 'finished' && (m.homeTeam.id === club.id || m.awayTeam.id === club.id))
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    const lastMatch = finishedMatches[0] || null;
+
+    const scheduledMatches = championship.matches
+        .filter(m => m.status === 'scheduled' && (m.homeTeam.id === club.id || m.awayTeam.id === club.id))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    const nextMatch = scheduledMatches[0] || null;
+
+    const lastFiveResults = finishedMatches.slice(0, 5).map(match => {
+        const isHome = match.homeTeam.id === club.id;
+        if (match.homeScore === match.awayScore) return 'D';
+        if (isHome) {
+            return match.homeScore! > match.awayScore! ? 'W' : 'L';
+        } else {
+            return match.awayScore! > match.homeScore! ? 'W' : 'L';
+        }
+    }).reverse() as ('W' | 'D' | 'L')[];
+    
+    return { standingPosition, lastFiveResults, lastMatch, nextMatch };
+  }, [championship, club.id]);
+    
+  const financialData = useMemo(() => {
+      const finesByRound = getClubFinesByRound(club, championship);
+      const registrationFee = championship.financials?.registrationFeePerClub || 0;
+      const isRegistrationPaid = championship.financials?.clubPayments?.[club.id] || false;
+      
+      const unpaidFines = finesByRound
+          .filter(fine => !championship.financials?.finePayments?.[club.id]?.[fine.round])
+          .reduce((acc, curr) => acc + curr.totalFine, 0);
+
+      const totalDue = (isRegistrationPaid ? 0 : registrationFee) + unpaidFines;
+      
+      return { finesByRound, registrationFee, isRegistrationPaid, totalDue };
+  }, [championship, club]);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<File | null>>, previewSetter: React.Dispatch<React.SetStateAction<string>>) => {
     if (e.target.files && e.target.files[0]) {
@@ -133,7 +268,6 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
     }
   };
 
-  // Club Handlers
   const handleSaveClubInfo = async () => {
     let uploadedLogoUrl: string | undefined = undefined;
 
@@ -162,7 +296,6 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
     setEditingClubLogoFile(null);
   };
 
-  // Player Handlers
   const handleAddPlayer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPlayerName.trim() || !newPlayerPosition.trim()) return;
@@ -210,7 +343,6 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
     setEditingPlayerPhotoPreview('');
   };
 
-  // Staff Handlers
   const handleAddStaff = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStaffName.trim() || !newStaffRole.trim()) return;
@@ -262,6 +394,78 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
             )}
         </div>
 
+        <div className="space-y-4 mb-8">
+            <CollapsibleSection title="Desempenho no Campeonato" isOpen={openSections.performance} onToggle={() => toggleSection('performance')}>
+                <div className="space-y-4 text-sm text-gray-300">
+                    <div>
+                        <span className="font-semibold text-gray-400">Posição:</span>
+                        <span className="font-bold text-white ml-2">{performanceData.standingPosition ? `${performanceData.standingPosition}º lugar` : 'N/A'}</span>
+                    </div>
+                    <div>
+                        <p className="font-semibold text-gray-400 mb-1">Últimos 5 Jogos:</p>
+                        <div className="flex gap-1.5">
+                            {performanceData.lastFiveResults.length > 0
+                                ? performanceData.lastFiveResults.map((res, i) => <ResultDot key={i} result={res} />)
+                                : <span className="text-xs text-gray-500">Nenhum jogo finalizado.</span>
+                            }
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                        <div>
+                            <p className="font-semibold text-gray-400 mb-1">Último Resultado:</p>
+                            {performanceData.lastMatch ? <MatchResultDisplay match={performanceData.lastMatch} /> : <span className="text-xs text-gray-500">N/A</span>}
+                        </div>
+                        <div>
+                            <p className="font-semibold text-gray-400 mb-1">Próximo Jogo:</p>
+                            {performanceData.nextMatch ? <NextMatchDisplay match={performanceData.nextMatch} /> : <span className="text-xs text-gray-500">N/A</span>}
+                        </div>
+                    </div>
+                </div>
+            </CollapsibleSection>
+            <CollapsibleSection title="Financeiro" isOpen={openSections.financials} onToggle={() => toggleSection('financials')}>
+                 <div className="space-y-4 text-sm">
+                    <div className="flex justify-between items-center p-2 bg-gray-900/50 rounded-lg">
+                        <div>
+                            <p className="font-semibold text-gray-300">Taxa de Inscrição</p>
+                            <p className="text-xl font-bold text-white">{financialData.registrationFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                        </div>
+                        <span className={`text-sm font-bold px-3 py-1 rounded-full ${financialData.isRegistrationPaid ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                            {financialData.isRegistrationPaid ? 'PAGO' : 'PENDENTE'}
+                        </span>
+                    </div>
+
+                    <div className="p-3 bg-gray-900/50 rounded-lg">
+                        <p className="font-semibold text-gray-300 mb-2">Multas por Rodada</p>
+                        {financialData.finesByRound.length > 0 ? (
+                            <div className="space-y-3">
+                                {financialData.finesByRound.map(({ round, totalFine }) => {
+                                    const isRoundPaid = championship.financials?.finePayments?.[club.id]?.[round] || false;
+                                    return (
+                                        <div key={round} className="flex justify-between items-center p-2 bg-gray-800/70 rounded">
+                                            <div>
+                                                <span className="font-bold text-white">{round}ª Rodada: </span>
+                                                <span className="font-semibold text-red-400">{totalFine.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                            </div>
+                                            <span className={`text-xs font-bold ${isRoundPaid ? 'text-green-400' : 'text-yellow-400'}`}>
+                                                {isRoundPaid ? 'PAGO' : 'PENDENTE'}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <p className="text-xs text-gray-500 text-center">Nenhuma multa registrada.</p>
+                        )}
+                    </div>
+                    
+                    <div className="flex justify-between p-3 bg-red-500/10 rounded-lg mt-2">
+                        <span className="font-bold text-red-300">Total a Pagar:</span>
+                        <span className="font-bold text-xl text-red-300">{financialData.totalDue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                    </div>
+                </div>
+            </CollapsibleSection>
+        </div>
+
         <div className="border-b border-gray-600 mb-6">
             <nav className="-mb-px flex space-x-2 sm:space-x-4" aria-label="Tabs">
                 <button onClick={() => setActiveTab('players')} className={`px-4 py-2 font-medium text-sm rounded-t-lg ${activeTab === 'players' ? 'bg-gray-700 text-green-400' : 'text-gray-400'}`}>Jogadores</button>
@@ -276,7 +480,6 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
             </div>
         )}
 
-        {/* Players Tab */}
         {activeTab === 'players' && (
             <div className="space-y-4">
                 <div className="flex justify-end">
@@ -346,7 +549,6 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
             </div>
         )}
 
-        {/* Staff Tab */}
         {activeTab === 'staff' && (
             <div className="space-y-4">
                 <div className="flex justify-end">
