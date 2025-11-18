@@ -170,6 +170,8 @@ const transformLeagues = (data: any[]): League[] => {
 
                     // MATCHES
                     let matches: Match[] = [];
+                    const allPlayersInChampionship = Array.from(clubMap.values()).flatMap(c => c.players);
+                    const playerNamesMap = new Map<string, string>(allPlayersInChampionship.map(p => [p.id, p.name]));
                     const rawMatches = Array.isArray(champData.matches) ? champData.matches : [];
                     for(const matchData of rawMatches) {
                         try {
@@ -180,7 +182,13 @@ const transformLeagues = (data: any[]): League[] => {
                             for(const e of rawEvents) {
                                 try {
                                     if (!e || typeof e !== 'object' || !e.type || !e.player_id) continue;
-                                    events.push({ type: e.type, playerId: String(e.player_id), minute: Number(e.minute) || 0, playerName: '' });
+                                    const playerIdStr = String(e.player_id);
+                                    events.push({ 
+                                        type: e.type, 
+                                        playerId: playerIdStr, 
+                                        minute: Number(e.minute) || 0, 
+                                        playerName: playerNamesMap.get(playerIdStr) || 'Desconhecido'
+                                    });
                                 } catch(er) { console.error("Error processing a match event record, skipping:", e, er); }
                             }
                             

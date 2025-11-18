@@ -25,7 +25,6 @@ interface AdminChampionshipPageProps {
   onBack: () => void;
   onSelectMatch: (match: Match) => void;
   onCreateClub: (name: string, abbreviation: string, logoUrl: string, whatsapp: string) => void;
-  onGenerateMatches: (config: ChampionshipWizardConfig) => void;
   onUpdateMatch: (updatedMatch: Match) => void;
   onNavigateToCreateMatches: () => void;
   onSaveFinancials: (championshipId: string, financials: ChampionshipFinancials) => void;
@@ -48,7 +47,6 @@ const AdminChampionshipPage: React.FC<AdminChampionshipPageProps> = ({
   onBack,
   onSelectMatch,
   onCreateClub,
-  onGenerateMatches,
   onUpdateMatch,
   onNavigateToCreateMatches,
   onSaveFinancials,
@@ -109,7 +107,6 @@ const AdminChampionshipPage: React.FC<AdminChampionshipPageProps> = ({
             onSelectMatch={onSelectMatch}
             league={league}
             championshipId={championship.id}
-            onGenerateMatches={onGenerateMatches}
             onUpdateMatch={onUpdateMatch}
             clubs={championship.clubs}
             onNavigateToCreateMatches={onNavigateToCreateMatches}

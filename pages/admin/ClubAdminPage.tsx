@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { League, Championship, Club, Player, TechnicalStaff, Match } from '../../types';
 import * as leagueService from '../../services/leagueService';
@@ -16,7 +13,7 @@ interface ClubAdminPageProps {
   onCreateStaff: (clubId: string, name: string, role: string) => void;
   onUpdateStaff: (clubId: string, updatedStaff: TechnicalStaff) => void;
   onDeleteStaff: (clubId: string, staffId: string) => void;
-  onUpdateClubDetails: (clubId: string, details: { name?: string; logoUrl?: string }) => void;
+  onUpdateClubDetails: (clubId: string, details: { name?: string; logoUrl?: string; whatsapp?: string; }) => void;
 }
 
 const getPlayerSuspensionDetails = (playerId: string, championship: Championship) => {
@@ -84,6 +81,14 @@ const maskCPF = (value: string) => {
   value = value.replace(/(\d{3})(\d)/, '$1.$2');
   value = value.replace(/(\d{3})(\d{2})$/, '$1-$2');
   return value.slice(0, 14);
+};
+
+const maskPhone = (value: string) => {
+  if (!value) return "";
+  value = value.replace(/\D/g, '');
+  value = value.replace(/^(\d{2})(\d)/g, '($1) $2');
+  value = value.replace(/(\d{5})(\d)/, '$1-$2');
+  return value.slice(0, 15); // (XX) XXXXX-XXXX
 };
 
 const positions = ['Goleiro', 'Defensor', 'Lateral', 'Meio-campo', 'Volante', 'Ponta', 'Atacante'];
@@ -190,6 +195,7 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
   // Club form state
   const [isEditingClubInfo, setIsEditingClubInfo] = useState(false);
   const [editingClubName, setEditingClubName] = useState(club.name);
+  const [editingClubWhatsapp, setEditingClubWhatsapp] = useState(club.whatsapp || '');
   const [editingClubLogoFile, setEditingClubLogoFile] = useState<File | null>(null);
   const [editingClubLogoPreview, setEditingClubLogoPreview] = useState<string>(club.logoUrl);
 
@@ -333,9 +339,13 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
         }
     }
 
-    const detailsToUpdate: { name?: string; logoUrl?: string } = {};
+    const detailsToUpdate: { name?: string; logoUrl?: string; whatsapp?: string } = {};
     if (editingClubName.trim() && editingClubName.trim() !== club.name) {
         detailsToUpdate.name = editingClubName.trim();
+    }
+     const cleanedWhatsapp = editingClubWhatsapp.replace(/\D/g, '');
+    if (cleanedWhatsapp && cleanedWhatsapp !== club.whatsapp) {
+        detailsToUpdate.whatsapp = cleanedWhatsapp;
     }
     if (uploadedLogoUrl) {
         detailsToUpdate.logoUrl = uploadedLogoUrl;
@@ -424,16 +434,28 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
             ) : (
                 <img src={club.logoUrl} alt={`${club.name} logo`} className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-4 border-gray-700"/>
             )}
-            <div className="flex-grow">
+            <div className="flex-grow space-y-2">
                 {isEditingClubInfo ? (
+                   <>
                     <input 
                         type="text" 
                         value={editingClubName} 
                         onChange={(e) => setEditingClubName(e.target.value)} 
                         className="bg-gray-700 text-2xl md:text-3xl font-extrabold text-white p-2 rounded-lg w-full"
                     />
+                    <input 
+                        type="tel"
+                        value={maskPhone(editingClubWhatsapp)}
+                        onChange={(e) => setEditingClubWhatsapp(e.target.value)}
+                        placeholder="(XX) XXXXX-XXXX"
+                        className="bg-gray-700 text-md font-mono text-gray-300 p-2 rounded-lg w-full"
+                    />
+                   </>
                 ) : (
-                    <h1 className="text-2xl md:text-3xl font-extrabold text-white">{club.name}</h1>
+                    <>
+                        <h1 className="text-2xl md:text-3xl font-extrabold text-white">{club.name}</h1>
+                        <p className="text-gray-400 font-mono">{club.whatsapp ? maskPhone(club.whatsapp) : 'WhatsApp não cadastrado'}</p>
+                    </>
                 )}
                 <p className="text-gray-400">Painel do Clube - {championship.name}</p>
             </div>
@@ -443,7 +465,7 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
                     <button onClick={() => setIsEditingClubInfo(false)} className="text-gray-300 hover:text-white p-2 rounded-lg text-sm">Cancelar</button>
                 </div>
             ) : (
-                <button onClick={() => { setIsEditingClubInfo(true); setEditingClubName(club.name); setEditingClubLogoPreview(club.logoUrl); }} className="bg-gray-700 hover:bg-gray-600 text-white font-bold p-2 rounded-lg text-sm">Editar</button>
+                <button onClick={() => { setIsEditingClubInfo(true); setEditingClubName(club.name); setEditingClubWhatsapp(club.whatsapp || ''); setEditingClubLogoPreview(club.logoUrl); }} className="bg-gray-700 hover:bg-gray-600 text-white font-bold p-2 rounded-lg text-sm self-start">Editar</button>
             )}
         </div>
 

@@ -333,7 +333,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
     const updatedFinancials: ChampionshipFinancials = {
         ...championship.financials,
         clubAdminTokens: {
-            ...championship.financials.clubAdminTokens,
+            ...(championship.financials.clubAdminTokens || {}),
             [clubId]: newToken
         }
     };

@@ -7,14 +7,13 @@ interface AdminFinancialsTabProps {
 }
 
 const AdminFinancialsTab: React.FC<AdminFinancialsTabProps> = ({ championship, onSave }) => {
-  const emptyForm: Omit<ChampionshipFinancials, 'totalCost'> = {
+  const emptyForm: Omit<ChampionshipFinancials, 'totalCost' | 'registrationFeePerClub'> = {
     refereeFee: 0,
     assistantFee: 0,
     tableOfficialFee: 0,
     fieldFee: 0,
     yellowCardFine: 0,
     redCardFine: 0,
-    registrationFeePerClub: 0,
     playerRegistrationDeadline: undefined,
   };
 
@@ -45,6 +44,7 @@ const AdminFinancialsTab: React.FC<AdminFinancialsTabProps> = ({ championship, o
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     const finalFinancials: ChampionshipFinancials = {
+        ...championship.financials, // Preserve existing optional fields like tokens
         ...formState,
         totalCost: calculatedValues.totalCost,
         registrationFeePerClub: calculatedValues.registrationFeePerClub

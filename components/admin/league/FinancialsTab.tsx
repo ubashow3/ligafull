@@ -16,6 +16,7 @@ const FinancialsTab: React.FC<FinancialsTabProps> = ({ league, onSaveFinancials 
     fieldFee: 0,
     yellowCardFine: 0,
     redCardFine: 0,
+    playerRegistrationDeadline: undefined,
   };
 
   const [formState, setFormState] = useState(emptyForm);
