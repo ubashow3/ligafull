@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-// FIX: Import ChampionshipWizardConfig for correct prop typing.
 import { Championship, League, Club, Match, Player, ChampionshipWizardConfig } from '../types';
 import StandingsTab from '../components/championship/StandingsTab';
 import MatchesTab from '../components/championship/MatchesTab';
@@ -26,7 +25,6 @@ interface ChampionshipPageProps {
   onSelectMatch: (match: Match) => void;
   isAdminMode: boolean;
   onCreateClub: (name: string, abbreviation: string, logoUrl: string, whatsapp: string) => void;
-  // FIX: Updated prop to use ChampionshipWizardConfig type for consistency.
   onGenerateMatches: (config: ChampionshipWizardConfig) => void;
 }
 
@@ -85,12 +83,11 @@ const ChampionshipPage: React.FC<ChampionshipPageProps> = ({
             matches={championship.matches} 
             isAdminMode={isAdminMode} 
             onSelectMatch={onSelectMatch}
-            // FIX: Removed unused props that were causing potential type issues.
-            onGenerateMatches={onGenerateMatches}
             clubs={championship.clubs}
+            onGenerateMatches={onGenerateMatches}
           />
         )}
-        {activeTab === 'clubs' && <ClubsTab clubs={championship.clubs} championship={championship} isAdminMode={isAdminMode} onCreateClub={onCreateClub} onPlayerClick={setSelectedPlayer} />}
+        {activeTab === 'clubs' && <ClubsTab clubs={championship.clubs} championship={championship} isAdminMode={isAdminMode} onPlayerClick={setSelectedPlayer} onCreateClub={onCreateClub} />}
         {activeTab === 'top_scorers' && <TopScorersTab topScorers={topScorers} />}
       </div>
       

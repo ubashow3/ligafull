@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { League, Championship, Club, Player, TechnicalStaff, Match } from '../../types';
 import * as leagueService from '../../services/leagueService';
@@ -20,7 +21,19 @@ const getPlayerSuspensionDetails = (playerId: string, championship: Championship
     const playerEvents = championship.matches
         .flatMap(match => match.events.map(event => ({ ...event, round: match.round, date: match.date })))
         .filter(event => event.playerId === playerId && (event.type === 'yellow_card' || event.type === 'red_card'))
-        .sort((a, b) => (a.round as number) - (b.round as number) || new Date(a.date).getTime() - new Date(b.date).getTime());
+        .sort((a, b) => {
+            const roundDiff = (a.round as number) - (b.round as number);
+            if (roundDiff !== 0) return roundDiff;
+        
+            const timeA = new Date(a.date).getTime();
+            const timeB = new Date(b.date).getTime();
+        
+            if (isNaN(timeA) || isNaN(timeB)) {
+                return 0; // Don't sort if dates are invalid, just maintain order.
+            }
+        
+            return timeA - timeB;
+        });
     
     const cardHistory = playerEvents.map(event => ({
         type: event.type,

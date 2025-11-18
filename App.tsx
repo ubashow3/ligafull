@@ -659,7 +659,15 @@ const App: React.FC = () => {
             if (currentLeague) return <LeaguePage league={currentLeague} onSelectChampionship={champ => setView({ name: 'championship', leagueId: currentLeague.id, championshipId: champ.id })} onBack={() => setView({ name: 'home' })} isAdminMode={false} onCreateChampionship={(leagueId: string, champName: string) => {}} />;
             break;
         case 'championship':
-            if (currentChampionship && currentLeague) return <ChampionshipPage championship={currentChampionship} league={currentLeague} onBack={() => setView({ name: 'league', leagueId: currentLeague.id })} onSelectMatch={match => setView({ name: 'match', leagueId: currentLeague.id, championshipId: currentChampionship.id, matchId: match.id })} isAdminMode={false} onCreateClub={(name: string, abbreviation: string, logoUrl: string, whatsapp: string) => {}} onGenerateMatches={(config: ChampionshipWizardConfig) => {}} />;
+            if (currentChampionship && currentLeague) return <ChampionshipPage 
+                championship={currentChampionship} 
+                league={currentLeague} 
+                onBack={() => setView({ name: 'league', leagueId: currentLeague.id })} 
+                onSelectMatch={match => setView({ name: 'match', leagueId: currentLeague.id, championshipId: currentChampionship.id, matchId: match.id })} 
+                isAdminMode={false}
+                onCreateClub={(name: string, abbreviation: string, logoUrl: string, whatsapp: string) => {}}
+                onGenerateMatches={(config: ChampionshipWizardConfig) => {}}
+                />;
             break;
         case 'match':
             if (currentMatch && currentLeague && currentChampionship) return <MatchSummaryPage match={currentMatch} league={currentLeague} onBack={() => setView({ name: 'championship', leagueId: currentLeague.id, championshipId: currentChampionship.id })} />;

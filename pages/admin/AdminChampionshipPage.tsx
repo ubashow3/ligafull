@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Championship, League, Match, Player, TechnicalStaff, ChampionshipWizardConfig, ChampionshipFinancials } from '../../types';
 import AdminStandingsTab from '../../components/admin/championship/AdminStandingsTab';
-import AdminMatchesTab from '../../components/admin/championship/AdminMatchesTab';
+import AdminMatchesTab from './AdminMatchesTab';
 import AdminClubsTab from '../../components/admin/championship/AdminClubsTab';
 import AdminTopScorersTab from '../../components/admin/championship/AdminTopScorersTab';
 import AdminFinancialsTab from '../../components/admin/championship/AdminFinancialsTab';

@@ -1,7 +1,6 @@
 
 
 import React, { useState, useMemo } from 'react';
-// FIX: Import ChampionshipWizardConfig and remove unused ChampionshipFormat.
 import { Match, Club, ChampionshipWizardConfig } from '../../types';
 import MatchGenerationModal from './MatchGenerationModal';
 
@@ -9,7 +8,6 @@ interface MatchesTabProps {
   matches: Match[];
   isAdminMode: boolean;
   onSelectMatch: (match: Match) => void;
-  // FIX: Updated prop to use ChampionshipWizardConfig for consistency.
   onGenerateMatches: (config: ChampionshipWizardConfig) => void;
   clubs: Club[];
 }
