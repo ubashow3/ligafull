@@ -1,7 +1,7 @@
 
-
-import { supabase } from '../supabaseClient';
+import { createClient } from '@supabase/supabase-js';
 import { League, Championship, Club, Match, Player, TechnicalStaff, Official, MatchEvent, ChampionshipFinancials } from '../types';
+import { supabase } from '../supabaseClient';
 
 // Helper function to generate a slug
 const generateSlug = (name: string) => {
@@ -49,34 +49,37 @@ const resizeImage = (file: File, width: number, height: number): Promise<File> =
 export const uploadImage = async (file: File): Promise<string> => {
     if (!file) return '';
     
-    const resizedFile = await resizeImage(file, 100, 100);
+    try {
+        const resizedFile = await resizeImage(file, 100, 100);
 
-    const fileExt = resizedFile.name.split('.').pop() || 'jpg';
-    const fileName = `${crypto.randomUUID()}.${fileExt}`;
-    const filePath = `${fileName}`;
+        const fileExt = resizedFile.name.split('.').pop() || 'jpg';
+        const fileName = `${crypto.randomUUID()}.${fileExt}`;
+        const filePath = `${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
-        .from('images')
-        .upload(filePath, resizedFile);
+        const { error: uploadError } = await supabase.storage
+            .from('images')
+            .upload(filePath, resizedFile);
 
-    if (uploadError) {
-        console.error('Error uploading image:', uploadError);
-        throw new Error(`Falha no upload da imagem: ${uploadError.message}`);
+        if (uploadError) {
+            console.error('Error uploading image:', uploadError);
+            throw new Error(`Falha no upload da imagem: ${uploadError.message || JSON.stringify(uploadError)}`);
+        }
+
+        const { data } = supabase.storage
+            .from('images')
+            .getPublicUrl(filePath);
+
+        if (!data?.publicUrl) {
+            throw new Error('Não foi possível obter a URL pública da imagem.');
+        }
+
+        return data.publicUrl;
+    } catch (e: any) {
+        throw new Error(e.message || 'Erro durante o processamento da imagem.');
     }
-
-    const { data } = supabase.storage
-        .from('images')
-        .getPublicUrl(filePath);
-
-    if (!data?.publicUrl) {
-        throw new Error('Não foi possível obter a URL pública da imagem.');
-    }
-
-    return data.publicUrl;
 };
 
-// "Bulletproof" data transformation. Uses imperative loops with individual try-catch blocks
-// to prevent a single corrupt record from crashing the entire app load.
+// "Bulletproof" data transformation.
 const transformLeagues = (data: any[]): League[] => {
     if (!Array.isArray(data)) return [];
 
@@ -162,7 +165,7 @@ const transformLeagues = (data: any[]): League[] => {
                     const getTeamObject = (teamId: string | null | undefined): Club => {
                         const id = String(teamId || '');
                         if (!id || !clubMap.has(id)) {
-                           const placeholderName = id.startsWith('ph-') ? id.substring(3).replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Time Inválido';
+                           const placeholderName = id.startsWith('ph-') ? id.substring(3).replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Time TBD';
                            return { id: id || `unknown-${crypto.randomUUID()}`, name: placeholderName, abbreviation: 'TBD', logoUrl: '', players: [], technicalStaff: [] };
                         }
                         return clubMap.get(id)!;
@@ -229,13 +232,13 @@ const transformLeagues = (data: any[]): League[] => {
                                 clubAdminTokens: rawFinancials.clubAdminTokens || {},
                             };
                         }
-                    } catch(e) { console.error("Error processing financials for championship, continuing without financials:", champData.id, e); financials = undefined; }
+                    } catch(e) { console.error("Error processing financials:", champData.id, e); financials = undefined; }
 
                     championships.push({ 
                         id: String(champData.id), name: String(champData.name || 'Nome Inválido'),
                         clubs, matches, standings: [], financials
                     });
-                } catch(e) { console.error("Error processing a championship record, skipping:", champData, e); }
+                } catch(e) { console.error("Error processing a championship record:", champData, e); }
             }
             
             leagues.push({
@@ -246,7 +249,7 @@ const transformLeagues = (data: any[]): League[] => {
                 referees, tableOfficials, championships
             });
         } catch (e) {
-            console.error(`Fatal error processing league data, skipping league:`, leagueData, e);
+            console.error(`Fatal error processing league data:`, leagueData, e);
         }
     }
     return leagues;
@@ -344,14 +347,14 @@ const structureChampionships = (data: any[]): any[] => {
                         .filter(club => club && typeof club === 'object' && club.id);
                     return { ...champ, clubs };
                 } catch (e) {
-                    console.error("Failed to structure championship clubs for championship:", champ.id, e);
+                    console.error("Failed to structure championship clubs:", champ.id, e);
                     return { ...champ, clubs: [] }; 
                 }
             }).filter(champ => champ !== null);
 
             return { ...league, championships: structuredChampionships };
         } catch (e) {
-            console.error("Failed to structure league championships for league:", league.id, e);
+            console.error("Failed to structure league championships:", league.id, e);
             return { ...league, championships: [] };
         }
     });
@@ -359,22 +362,50 @@ const structureChampionships = (data: any[]): any[] => {
 
 
 export const fetchLeagues = async (): Promise<League[]> => {
-    const { data, error } = await supabase.from('leagues').select(leagueQuery);
-    if (error) throw error;
-    const structuredData = structureChampionships(data);
-    return transformLeagues(structuredData);
+    try {
+        const { data, error } = await supabase.from('leagues').select(leagueQuery);
+        if (error) {
+            console.error("Supabase error (leagues):", error.code, error.message, error.details);
+            
+            let message = error.message || "Erro desconhecido ao carregar ligas.";
+            
+            // Tratamento específico para tabelas inexistentes
+            if (error.code === 'PGRST116' || error.message?.includes('schema cache')) {
+                message = "BANCO DE DADOS NÃO CONFIGURADO! Você precisa executar o script SQL no painel do Supabase para criar as tabelas.";
+            }
+            
+            throw new Error(message);
+        }
+        if (!data) return [];
+        const structuredData = structureChampionships(data);
+        return transformLeagues(structuredData);
+    } catch (e: any) {
+        // Garantir que o erro seja uma string ou Error com mensagem legível
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        console.error("Fatal error in fetchLeagues:", errorMessage);
+        throw new Error(errorMessage);
+    }
 };
 
 export const login = async (email: string, pass: string): Promise<League | null> => {
     if (!email || !pass) return null;
-    const { data, error } = await supabase.from('leagues')
-        .select(leagueQuery)
-        .ilike('admin_email', email.trim()) 
-        .eq('admin_password_hash', pass) 
-        .single();
-    if (error || !data) return null;
-    const structuredData = structureChampionships([data]);
-    return transformLeagues(structuredData)[0];
+    try {
+        const { data, error } = await supabase.from('leagues')
+            .select(leagueQuery)
+            .ilike('admin_email', email.trim()) 
+            .eq('admin_password_hash', pass) 
+            .single();
+        if (error) {
+            console.error("Login Supabase error:", error);
+            return null;
+        }
+        if (!data) return null;
+        const structuredData = structureChampionships([data]);
+        return transformLeagues(structuredData)[0];
+    } catch (e) {
+        console.error("Login processing error:", e);
+        return null;
+    }
 };
 
 export const createLeague = async (leagueData: { name: string, logoUrl: string, adminEmail: string, adminPassword: string, state: string, city: string }): Promise<League> => {
@@ -391,20 +422,19 @@ export const createLeague = async (leagueData: { name: string, logoUrl: string, 
     }).select().single();
 
     if (error) {
+        console.error("Create league Supabase error:", error);
         if (error.code === '23505') { 
             if (error.message.includes('leagues_slug_key')) {
-                throw new Error('Já existe uma liga com este nome (slug).');
+                throw new Error('Já existe uma liga com este nome.');
             }
             if (error.message.includes('leagues_admin_email_key') || error.message.includes('leagues_admin_email_idx')) {
-                throw new Error('Este e-mail já está sendo utilizado por outra liga.');
+                throw new Error('Este e-mail já está em uso.');
             }
         }
-        throw error;
+        throw new Error(`Erro ao criar liga: ${error.message || JSON.stringify(error)}`);
     }
     
-    if (!data) {
-        throw new Error("Não foi possível obter os dados da liga após a criação.");
-    }
+    if (!data) throw new Error("Erro ao criar liga: dados não retornados.");
 
     return {
         id: data.id,
@@ -427,7 +457,10 @@ export const createChampionship = async (leagueId: string, champName: string): P
         name: champName,
         league_id: leagueId
     }).select().single();
-    if (error) throw error;
+    if (error) {
+        console.error("Create champ Supabase error:", error);
+        throw new Error(`Erro ao criar campeonato: ${error.message || JSON.stringify(error)}`);
+    }
     return { ...data, clubs: [], matches: [], standings: [] };
 };
 
@@ -437,8 +470,8 @@ export const saveChampionshipFinancials = async (championshipId: string, financi
         .update({ financials })
         .eq('id', championshipId);
     if (error) {
-        console.error("Supabase saveChampionshipFinancials error:", error);
-        throw new Error(`Falha ao salvar dados financeiros: ${error.message}`);
+        console.error("Save financials Supabase error:", error);
+        throw new Error(`Erro ao salvar dados financeiros: ${error.message || JSON.stringify(error)}`);
     }
 };
 
@@ -450,13 +483,19 @@ export const addClubToChampionship = async (championshipId: string, clubData: { 
         logo_url: clubData.logoUrl,
         whatsapp: clubData.whatsapp,
     }).select().single();
-    if (clubError) throw clubError;
+    if (clubError) {
+        console.error("Add club Supabase error:", clubError);
+        throw new Error(`Erro ao adicionar clube: ${clubError.message || JSON.stringify(clubError)}`);
+    }
 
     const { error: linkError } = await supabase.from('championship_clubs').insert({
         championship_id: championshipId,
         club_id: newClub.id,
     });
-    if (linkError) throw linkError;
+    if (linkError) {
+        console.error("Link club Supabase error:", linkError);
+        throw new Error(`Erro ao vincular clube ao campeonato: ${linkError.message || JSON.stringify(linkError)}`);
+    }
 };
 
 export const updateClubDetails = async (clubId: string, details: { name?: string; logoUrl?: string; whatsapp?: string }) => {
@@ -465,12 +504,12 @@ export const updateClubDetails = async (clubId: string, details: { name?: string
     if (details.logoUrl) updateData.logo_url = details.logoUrl;
     if (details.whatsapp) updateData.whatsapp = details.whatsapp;
 
-    if (Object.keys(updateData).length === 0) return; // No changes to save
+    if (Object.keys(updateData).length === 0) return;
 
     const { error } = await supabase.from('clubs').update(updateData).eq('id', clubId);
     if (error) {
-        console.error("Supabase updateClubDetails error:", error);
-        throw new Error(`Falha ao atualizar detalhes do clube: ${error.message}`);
+        console.error("Update club details Supabase error:", error);
+        throw new Error(`Erro ao atualizar detalhes do clube: ${error.message || JSON.stringify(error)}`);
     }
 };
 
@@ -486,99 +525,102 @@ export const generateMatches = async (championshipId: string, matches: Match[]) 
         location: m.location,
     }));
     const { error } = await supabase.from('matches').insert(matchesToInsert);
-    if (error) throw error;
+    if (error) {
+        console.error("Generate matches Supabase error:", error);
+        throw new Error(`Erro ao gerar partidas: ${error.message || JSON.stringify(error)}`);
+    }
 };
 
 export const updateMatch = async (match: Match, league: League) => {
-    const officialsMap = new Map<string, string>([
-        ...league.referees.map((o): [string, string] => [o.name, o.id]),
-        ...league.tableOfficials.map((o): [string, string] => [o.name, o.id]),
-    ]);
+    try {
+        const officialsMap = new Map<string, string>([
+            ...league.referees.map((o): [string, string] => [o.name, o.id]),
+            ...league.tableOfficials.map((o): [string, string] => [o.name, o.id]),
+        ]);
 
-    const { error: matchError } = await supabase.from('matches').update({
-        home_score: match.homeScore,
-        away_score: match.awayScore,
-        status: match.status,
-        location: match.location,
-        match_date: match.date,
-        referee_id: match.referee ? officialsMap.get(match.referee) : null,
-        assistant1_id: match.assistant1 ? officialsMap.get(match.assistant1) : null,
-        assistant2_id: match.assistant2 ? officialsMap.get(match.assistant2) : null,
-        table_official_id: match.tableOfficial ? officialsMap.get(match.tableOfficial) : null,
-        home_team_id: match.homeTeam.id,
-        away_team_id: match.awayTeam.id,
-        home_lineup: match.homeLineup,
-        away_lineup: match.awayLineup,
-    }).eq('id', match.id);
-    if (matchError) throw matchError;
+        const { error: matchError } = await supabase.from('matches').update({
+            home_score: match.homeScore,
+            away_score: match.awayScore,
+            status: match.status,
+            location: match.location,
+            match_date: match.date,
+            referee_id: match.referee ? officialsMap.get(match.referee) : null,
+            assistant1_id: match.assistant1 ? officialsMap.get(match.assistant1) : null,
+            assistant2_id: match.assistant2 ? officialsMap.get(match.assistant2) : null,
+            table_official_id: match.tableOfficial ? officialsMap.get(match.tableOfficial) : null,
+            home_team_id: match.homeTeam.id,
+            away_team_id: match.awayTeam.id,
+            home_lineup: match.homeLineup,
+            away_lineup: match.awayLineup,
+        }).eq('id', match.id);
+        
+        if (matchError) throw matchError;
 
-    const { error: deleteError } = await supabase.from('match_events').delete().eq('match_id', match.id);
-    if (deleteError) throw deleteError;
-    
-    if (match.events.length > 0) {
-        const eventsToInsert = match.events.map(e => ({
-            match_id: match.id,
-            player_id: e.playerId,
-            type: e.type,
-            minute: e.minute
-        }));
-        const { error: insertError } = await supabase.from('match_events').insert(eventsToInsert);
-        if (insertError) throw insertError;
-    }
-
-    const championshipId = match.championship_id;
-    if (!championshipId) {
-        console.warn("Could not update player goals: Championship ID not found in match object.");
-        return;
-    }
-
-    const { data: championshipClubs, error: clubsError } = await supabase
-        .from('championship_clubs')
-        .select('club_id')
-        .eq('championship_id', championshipId);
-    if (clubsError) throw clubsError;
-    
-    const clubIds = (championshipClubs || []).map(cc => cc.club_id);
-    if (clubIds.length === 0) return;
-
-    const { data: playersInChampionship, error: playersError } = await supabase
-        .from('players')
-        .select('*')
-        .in('club_id', clubIds);
-    if (playersError) throw playersError;
-
-    const allPlayerGoals: { [key: string]: number } = {};
-    (playersInChampionship || []).forEach(p => { allPlayerGoals[p.id] = 0; });
-
-    const { data: allMatchEvents, error: eventsError } = await supabase
-        .from('match_events')
-        .select('player_id, matches!inner(championship_id)')
-        .eq('matches.championship_id', championshipId)
-        .eq('type', 'goal');
-    if (eventsError) throw eventsError;
-
-    (allMatchEvents || []).forEach(event => {
-        if (event.player_id && allPlayerGoals.hasOwnProperty(event.player_id)) {
-            allPlayerGoals[event.player_id]++;
+        const { error: deleteError } = await supabase.from('match_events').delete().eq('match_id', match.id);
+        if (deleteError) throw deleteError;
+        
+        if (match.events.length > 0) {
+            const eventsToInsert = match.events.map(e => ({
+                match_id: match.id,
+                player_id: e.playerId,
+                type: e.type,
+                minute: e.minute
+            }));
+            const { error: insertError } = await supabase.from('match_events').insert(eventsToInsert);
+            if (insertError) throw insertError;
         }
-    });
-    
-    const playersToUpdate = (playersInChampionship || [])
-        .filter(player => player && player.name)
-        .map(player => ({
-            ...player,
-            goals_in_championship: allPlayerGoals[player.id] || 0,
-        }));
-    
-    if (playersToUpdate.length > 0) {
-        const { error: upsertError } = await supabase
+
+        const championshipId = match.championship_id;
+        if (!championshipId) return;
+
+        // Reprocess goals for all players in the championship to ensure consistency
+        const { data: championshipClubs, error: clubsError } = await supabase
+            .from('championship_clubs')
+            .select('club_id')
+            .eq('championship_id', championshipId);
+        if (clubsError) throw clubsError;
+        
+        const clubIds = (championshipClubs || []).map(cc => cc.club_id);
+        if (clubIds.length === 0) return;
+
+        const { data: playersInChampionship, error: playersError } = await supabase
             .from('players')
-            .upsert(playersToUpdate, { onConflict: 'id' });
+            .select('*')
+            .in('club_id', clubIds);
+        if (playersError) throw playersError;
 
-        if (upsertError) {
-            console.error(`Failed to upsert player goals`, upsertError);
-            throw upsertError;
+        const allPlayerGoals: { [key: string]: number } = {};
+        (playersInChampionship || []).forEach(p => { allPlayerGoals[p.id] = 0; });
+
+        const { data: allMatchEvents, error: eventsError } = await supabase
+            .from('match_events')
+            .select('player_id, matches!inner(championship_id)')
+            .eq('matches.championship_id', championshipId)
+            .eq('type', 'goal');
+        if (eventsError) throw eventsError;
+
+        (allMatchEvents || []).forEach(event => {
+            if (event.player_id && allPlayerGoals.hasOwnProperty(event.player_id)) {
+                allPlayerGoals[event.player_id]++;
+            }
+        });
+        
+        const playersToUpdate = (playersInChampionship || [])
+            .filter(player => player && player.id)
+            .map(player => ({
+                ...player,
+                goals_in_championship: allPlayerGoals[player.id] || 0,
+            }));
+        
+        if (playersToUpdate.length > 0) {
+            const { error: upsertError } = await supabase
+                .from('players')
+                .upsert(playersToUpdate, { onConflict: 'id' });
+            if (upsertError) throw upsertError;
         }
+    } catch (e: any) {
+        console.error("Match update fatal error:", e);
+        throw new Error(`Erro ao atualizar partida: ${e.message || JSON.stringify(e)}`);
     }
 };
 
@@ -593,25 +635,25 @@ export const createOfficial = async (leagueId: string, type: 'referees' | 'table
         cpf,
         bank_account: bankAccount,
         type: type === 'referees' ? 'referee' : 'table_official',
-    }).select();
+    });
     if (error) {
-        console.error("Supabase createOfficial error:", error);
-        throw new Error(`Falha ao criar oficial: ${error.message}`);
+        console.error("Create official Supabase error:", error);
+        throw new Error(`Erro ao criar oficial: ${error.message || JSON.stringify(error)}`);
     }
 };
 export const updateOfficial = async (official: Official) => {
     const { id, name, nickname, cpf, bankAccount } = official;
     const { error } = await supabase.from('officials').update({ name, nickname, cpf, bank_account: bankAccount }).eq('id', id);
     if (error) {
-        console.error("Supabase updateOfficial error:", error);
-        throw new Error(`Falha ao atualizar oficial: ${error.message}`);
+        console.error("Update official Supabase error:", error);
+        throw new Error(`Erro ao atualizar oficial: ${error.message || JSON.stringify(error)}`);
     }
 };
 export const deleteOfficial = async (id: string) => {
     const { error } = await supabase.from('officials').delete().eq('id', id);
     if (error) {
-        console.error("Supabase deleteOfficial error:", error);
-        throw new Error(`Falha ao deletar oficial: ${error.message}`);
+        console.error("Delete official Supabase error:", error);
+        throw new Error(`Erro ao deletar oficial: ${error.message || JSON.stringify(error)}`);
     }
 };
 
@@ -630,8 +672,8 @@ export const createPlayer = async (clubId: string, player: Omit<Player, 'id'>) =
         goals_in_championship: goals,
     }).select();
     if (error) {
-        console.error("Supabase createPlayer error:", error);
-        throw new Error(`Falha ao criar jogador: ${error.message}`);
+        console.error("Create player Supabase error:", error);
+        throw new Error(`Erro ao criar jogador: ${error.message || JSON.stringify(error)}`);
     }
     return data;
 };
@@ -646,15 +688,15 @@ export const updatePlayer = async (player: Player) => {
         birth_date: birthDate || null 
     }).eq('id', id);
     if (error) {
-        console.error("Supabase updatePlayer error:", error);
-        throw new Error(`Falha ao atualizar jogador: ${error.message}`);
+        console.error("Update player Supabase error:", error);
+        throw new Error(`Erro ao atualizar jogador: ${error.message || JSON.stringify(error)}`);
     }
 };
 export const deletePlayer = async (id: string) => {
     const { error } = await supabase.from('players').delete().eq('id', id);
     if (error) {
-        console.error("Supabase deletePlayer error:", error);
-        throw new Error(`Falha ao deletar jogador: ${error.message}`);
+        console.error("Delete player Supabase error:", error);
+        throw new Error(`Erro ao deletar jogador: ${error.message || JSON.stringify(error)}`);
     }
 };
 
@@ -668,8 +710,8 @@ export const createStaff = async (clubId: string, staff: Omit<TechnicalStaff, 'i
         role,
     }).select();
     if (error) {
-        console.error("Supabase createStaff error:", error);
-        throw new Error(`Falha ao criar membro da comissão: ${error.message}`);
+        console.error("Create staff Supabase error:", error);
+        throw new Error(`Erro ao criar staff: ${error.message || JSON.stringify(error)}`);
     }
     return data;
 };
@@ -677,135 +719,13 @@ export const updateStaff = async (staff: TechnicalStaff) => {
     const { id, name, role } = staff;
     const { error } = await supabase.from('technical_staff').update({ name, role }).eq('id', id);
     if (error) {
-        console.error("Supabase updateStaff error:", error);
-        throw new Error(`Falha ao atualizar membro da comissão: ${error.message}`);
+        console.error("Update staff Supabase error:", error);
+        throw new Error(`Erro ao atualizar staff: ${error.message || JSON.stringify(error)}`);
     }
 };
 export const deleteStaff = async (id: string) => {
     const { error } = await supabase.from('technical_staff').delete().eq('id', id);
     if (error) {
-        console.error("Supabase deleteStaff error:", error);
-        throw new Error(`Falha ao deletar membro da comissão: ${error.message}`);
+        console.error("Delete staff Supabase error:", error);
+        throw new Error(`Erro ao deletar staff: ${error.message || JSON.stringify(error)}`);
     }
-};
-
-export const createOrGetPlaceholderClub = async (clubName: string): Promise<Club> => {
-    const { data: existingClub, error: selectError } = await supabase
-        .from('clubs')
-        .select('*')
-        .eq('name', clubName)
-        .maybeSingle();
-
-    if (selectError) throw selectError;
-
-    if (existingClub) {
-        return {
-            id: existingClub.id,
-            name: existingClub.name,
-            abbreviation: existingClub.abbreviation,
-            logoUrl: existingClub.logo_url,
-            whatsapp: existingClub.whatsapp,
-            players: [],
-            technicalStaff: []
-        };
-    }
-
-    const newPlaceholderClub = {
-        id: `ph-${clubName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-        name: clubName,
-        abbreviation: 'TBD',
-        logo_url: ''
-    };
-    
-    const { data: newClub, error: insertError } = await supabase
-        .from('clubs')
-        .insert(newPlaceholderClub)
-        .select()
-        .single();
-
-    if (insertError) throw insertError;
-    
-    return {
-        id: newClub.id,
-        name: newClub.name,
-        abbreviation: newClub.abbreviation,
-        logoUrl: newClub.logo_url,
-        whatsapp: newClub.whatsapp,
-        players: [],
-        technicalStaff: []
-    };
-};
-
-export const updateClubRegistrationStatus = async (championshipId: string, clubId: string, isPaid: boolean) => {
-    // 1. Fetch current financials
-    const { data, error: fetchError } = await supabase
-        .from('championships')
-        .select('financials')
-        .eq('id', championshipId)
-        .single();
-    
-    if (fetchError) {
-        console.error("Supabase updateClubRegistrationStatus (fetch) error:", fetchError);
-        throw new Error(`Falha ao buscar dados financeiros: ${fetchError.message}`);
-    }
-
-    const currentFinancials = (data?.financials || {}) as Partial<ChampionshipFinancials>;
-
-    // 2. Update the clubPayments map
-    const updatedFinancials = {
-        ...currentFinancials,
-        clubPayments: {
-            ...(currentFinancials.clubPayments || {}),
-            [clubId]: isPaid,
-        },
-    };
-
-    // 3. Save the updated financials object
-    const { error: updateError } = await supabase
-        .from('championships')
-        .update({ financials: updatedFinancials })
-        .eq('id', championshipId);
-
-    if (updateError) {
-        console.error("Supabase updateClubRegistrationStatus (update) error:", updateError);
-        throw new Error(`Falha ao atualizar status de pagamento: ${updateError.message}`);
-    }
-};
-
-export const updateClubFinePaymentStatus = async (championshipId: string, clubId: string, round: number, isPaid: boolean) => {
-    const { data, error: fetchError } = await supabase
-        .from('championships')
-        .select('financials')
-        .eq('id', championshipId)
-        .single();
-    
-    if (fetchError) {
-        console.error("Supabase updateClubFinePaymentStatus (fetch) error:", fetchError);
-        throw new Error(`Falha ao buscar dados financeiros: ${fetchError.message}`);
-    }
-
-    const currentFinancials = (data?.financials || {}) as Partial<ChampionshipFinancials>;
-    
-    const clubFinePayments = currentFinancials.finePayments?.[clubId] || {};
-
-    const updatedFinancials = {
-        ...currentFinancials,
-        finePayments: {
-            ...(currentFinancials.finePayments || {}),
-            [clubId]: {
-                ...clubFinePayments,
-                [round]: isPaid,
-            },
-        },
-    };
-
-    const { error: updateError } = await supabase
-        .from('championships')
-        .update({ financials: updatedFinancials })
-        .eq('id', championshipId);
-
-    if (updateError) {
-        console.error("Supabase updateClubFinePaymentStatus (update) error:", updateError);
-        throw new Error(`Falha ao atualizar status de pagamento da multa: ${updateError.message}`);
-    }
-};
