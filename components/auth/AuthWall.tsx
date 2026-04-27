@@ -34,13 +34,18 @@ const AuthWall: React.FC<AuthWallProps> = ({ onLoginSuccess }) => {
                 const user = await leagueService.userLogin(formData.email, formData.password);
                 if (user) {
                     onLoginSuccess(user);
-                } else {
-                    throw new Error('Email ou senha incorretos');
                 }
             }
         } catch (err: any) {
             console.error('Registration/Login Error:', err);
-            const msg = err.message || (typeof err === 'string' ? err : 'Ocorreu um erro inesperado');
+            let msg = 'Ocorreu um erro inesperado';
+            if (err instanceof Error) {
+                msg = err.message;
+            } else if (typeof err === 'string') {
+                msg = err;
+            } else if (err && typeof err === 'object') {
+                msg = err.error || err.message || JSON.stringify(err);
+            }
             setError(msg);
         } finally {
             setIsLoading(false);

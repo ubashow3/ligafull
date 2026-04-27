@@ -32,23 +32,26 @@ export const userRegister = async (userData: any): Promise<UserProfile> => {
     });
     
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.log('User registration error data:', errorData);
-        
+        const rawText = await response.text();
         let errorMessage = 'Falha no registro';
-        if (typeof errorData.error === 'string') {
-            errorMessage = errorData.error;
-        } else if (errorData.error && typeof errorData.error === 'object') {
-            errorMessage = errorData.error.message || JSON.stringify(errorData.error);
-        } else if (errorData.message) {
-            errorMessage = errorData.message;
+        
+        try {
+            const errorData = JSON.parse(rawText);
+            if (errorData.error) {
+                errorMessage = typeof errorData.error === 'string' ? errorData.error : (errorData.error.message || JSON.stringify(errorData.error));
+            } else if (errorData.message) {
+                errorMessage = typeof errorData.message === 'string' ? errorData.message : (errorData.message.message || JSON.stringify(errorData.message));
+            } else {
+                errorMessage = JSON.stringify(errorData);
+            }
+        } catch (e) {
+            errorMessage = rawText || response.statusText || 'Erro desconhecido';
         }
         
-        console.error('Registration Error Details:', {
-            status: response.status,
-            errorData,
-            errorMessage
-        });
+        // Final guard to ensure it's a string
+        if (typeof errorMessage !== 'string') {
+            errorMessage = String(errorMessage);
+        }
         
         throw new Error(errorMessage);
     }
@@ -57,19 +60,27 @@ export const userRegister = async (userData: any): Promise<UserProfile> => {
 };
 
 export const userLogin = async (email: string, pass: string): Promise<UserProfile | null> => {
-    try {
-        const response = await fetch(`${API_BASE_URL}/user_login.php`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password: pass })
-        });
-        
-        if (response.ok) return await response.json();
-        return null;
-    } catch (error) {
-        console.error('Erro no login do usuário:', error);
-        return null;
+    const response = await fetch(`${API_BASE_URL}/user_login.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pass })
+    });
+    
+    if (!response.ok) {
+        const rawText = await response.text();
+        let errorMessage = 'Email ou senha incorretos';
+        try {
+            const errorData = JSON.parse(rawText);
+            errorMessage = errorData.error || errorData.message || errorMessage;
+            if (typeof errorMessage !== 'string') errorMessage = JSON.stringify(errorMessage);
+        } catch (e) {
+            // Se não for JSON, usamos o texto puro se for curto
+            if (rawText && rawText.length < 100) errorMessage = rawText;
+        }
+        throw new Error(errorMessage);
     }
+    
+    return await response.json();
 };
 
 export const createGuestProfile = (): UserProfile => {
