@@ -46,14 +46,14 @@ const AuthWall: React.FC<AuthWallProps> = ({ onLoginSuccess }) => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+        <div className="fixed inset-0 bg-gray-900 flex flex-col items-center justify-center p-4 overflow-hidden z-[9999] pointer-events-auto">
             {/* Background Decorativo */}
-            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-20">
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-20 z-0">
                 <div className="absolute -top-24 -left-24 w-96 h-96 bg-green-500 rounded-full blur-3xl"></div>
                 <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-blue-600 rounded-full blur-3xl"></div>
             </div>
 
-            <div className="max-w-md w-full bg-gray-800/50 backdrop-blur-xl border border-gray-700 rounded-3xl p-8 shadow-2xl relative z-10 animate-fade-in">
+            <div className="max-w-md w-full bg-gray-800/50 backdrop-blur-xl border border-gray-700 rounded-3xl p-8 shadow-2xl relative z-[10000] animate-fade-in pointer-events-auto">
                 <div className="text-center mb-8">
                     <div className="inline-flex items-center justify-center w-20 h-20 bg-green-500/10 rounded-2xl mb-4 border border-green-500/20">
                         <Trophy className="w-10 h-10 text-green-400" />

@@ -517,21 +517,29 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-gray-900 text-gray-200 min-h-screen font-sans">
-      <Header
-        onTitleClick={() => isAdminMode ? handleLogout() : setView({ name: 'home' })}
-        onAdminClick={handleAdminClick}
-        onMenuClick={() => setIsSidebarOpen(true)}
-        onLogoutClick={handleLogout}
-        isAdminMode={isAdminMode}
-        user={user}
-      />
-      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} leagues={processedLeagues} onSelectLeague={league => { setView({ name: 'league', leagueId: league.id }); setIsSidebarOpen(false); }} />
-      <main className="container mx-auto px-4 py-8">
-        {renderContent()}
-      </main>
-      <Footer />
-      <AdminModal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} onNavigateToCreateLeague={() => { setIsAdminModalOpen(false); setView({ name: 'create_league' }); }} onLogin={handleLogin} user={user} />
-      <AdminActionsModal isOpen={isAdminActionsModalOpen} onClose={() => setIsAdminActionsModalOpen(false)} onLogout={handleLogout} />
+      {(!user && !isAdminMode) ? (
+        <main className="container mx-auto px-4 py-8">
+          {renderContent()}
+        </main>
+      ) : (
+        <>
+          <Header
+            onTitleClick={() => isAdminMode ? handleLogout() : setView({ name: 'home' })}
+            onAdminClick={handleAdminClick}
+            onMenuClick={() => setIsSidebarOpen(true)}
+            onLogoutClick={handleLogout}
+            isAdminMode={isAdminMode}
+            user={user}
+          />
+          <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} leagues={processedLeagues} onSelectLeague={league => { setView({ name: 'league', leagueId: league.id }); setIsSidebarOpen(false); }} />
+          <main className="container mx-auto px-4 py-8">
+            {renderContent()}
+          </main>
+          <Footer />
+          <AdminModal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} onNavigateToCreateLeague={() => { setIsAdminModalOpen(false); setView({ name: 'create_league' }); }} onLogin={handleLogin} user={user} />
+          <AdminActionsModal isOpen={isAdminActionsModalOpen} onClose={() => setIsAdminActionsModalOpen(false)} onLogout={handleLogout} />
+        </>
+      )}
     </div>
   );
 };
