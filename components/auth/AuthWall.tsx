@@ -39,7 +39,9 @@ const AuthWall: React.FC<AuthWallProps> = ({ onLoginSuccess }) => {
                 }
             }
         } catch (err: any) {
-            setError(err.message);
+            console.error('Registration/Login Error:', err);
+            const msg = err.message || (typeof err === 'string' ? err : 'Ocorreu um erro inesperado');
+            setError(msg);
         } finally {
             setIsLoading(false);
         }
@@ -64,7 +66,7 @@ const AuthWall: React.FC<AuthWallProps> = ({ onLoginSuccess }) => {
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {error && (
-                        <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded-xl text-center">
+                        <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded-xl text-center max-h-32 overflow-y-auto no-scrollbar">
                             {error}
                         </div>
                     )}

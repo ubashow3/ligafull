@@ -368,9 +368,17 @@ async function startServer() {
       db.prepare('INSERT INTO users (id, full_name, email, password_hash, photo_url) VALUES (?, ?, ?, ?, ?)').run(
         id, full_name, email, hash, photo_url
       );
+      console.log(`User registered successfully: ${email}`);
       res.json({ id, full_name, email, photo_url, is_paid: true });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      console.error('Registration Error:', error);
+      let errorMessage = error.message || 'Erro desconhecido no servidor';
+      if (errorMessage.includes('UNIQUE constraint failed: users.email')) {
+        errorMessage = 'Este e-mail já está cadastrado. Tente fazer login ou use outro.';
+      }
+      res.status(500).json({ 
+        error: errorMessage
+      });
     }
   });
 

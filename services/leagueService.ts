@@ -32,8 +32,25 @@ export const userRegister = async (userData: any): Promise<UserProfile> => {
     });
     
     if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Falha no registro');
+        const errorData = await response.json().catch(() => ({}));
+        console.log('User registration error data:', errorData);
+        
+        let errorMessage = 'Falha no registro';
+        if (typeof errorData.error === 'string') {
+            errorMessage = errorData.error;
+        } else if (errorData.error && typeof errorData.error === 'object') {
+            errorMessage = errorData.error.message || JSON.stringify(errorData.error);
+        } else if (errorData.message) {
+            errorMessage = errorData.message;
+        }
+        
+        console.error('Registration Error Details:', {
+            status: response.status,
+            errorData,
+            errorMessage
+        });
+        
+        throw new Error(errorMessage);
     }
     
     return await response.json();
