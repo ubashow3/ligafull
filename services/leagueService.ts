@@ -10,7 +10,7 @@ export const uploadImage = async (file: File): Promise<string> => {
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await fetch(`${API_BASE_URL}/upload.php`, {
+        const response = await fetch(`${API_BASE_URL}/upload`, {
             method: 'POST',
             body: formData
         });
@@ -25,7 +25,7 @@ export const uploadImage = async (file: File): Promise<string> => {
 };
 
 export const userRegister = async (userData: any): Promise<UserProfile> => {
-    const response = await fetch(`${API_BASE_URL}/user_register.php`, {
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData)
@@ -60,7 +60,7 @@ export const userRegister = async (userData: any): Promise<UserProfile> => {
 };
 
 export const userLogin = async (email: string, pass: string): Promise<UserProfile | null> => {
-    const response = await fetch(`${API_BASE_URL}/user_login.php`, {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password: pass })
@@ -109,13 +109,13 @@ export const getOrCreateProfile = async (userData: any): Promise<UserProfile> =>
     if (userData.full_name) return userData;
 
     // Otherwise, this might be from a legacy auth provider or social login
-    // In our new SQLite model, we use user_login.php or user_register.php
+    // In our new SQLite model, we use auth routes (login/register) instead of .php files.
     return userData;
 };
 
 export const fetchAds = async (): Promise<Ad[]> => {
     try {
-        const response = await fetch(`${API_BASE_URL}/ads.php`);
+        const response = await fetch(`${API_BASE_URL}/ads`);
         if (!response.ok) return [];
         return await response.json();
     } catch (err) {
@@ -125,7 +125,7 @@ export const fetchAds = async (): Promise<Ad[]> => {
 
 export const fetchPosts = async (leagueId: string): Promise<Post[]> => {
     try {
-        const response = await fetch(`${API_BASE_URL}/posts.php?league_id=${leagueId}`);
+        const response = await fetch(`${API_BASE_URL}/posts?league_id=${leagueId}`);
         if (!response.ok) return [];
         return await response.json();
     } catch (err) {
@@ -135,7 +135,7 @@ export const fetchPosts = async (leagueId: string): Promise<Post[]> => {
 };
 
 export const createPost = async (postData: Omit<Post, 'id' | 'created_at'>): Promise<Post> => {
-    const response = await fetch(`${API_BASE_URL}/create_post.php`, {
+    const response = await fetch(`${API_BASE_URL}/posts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(postData)
@@ -146,7 +146,7 @@ export const createPost = async (postData: Omit<Post, 'id' | 'created_at'>): Pro
 };
 
 export const createClub = async (championshipId: string, clubData: any): Promise<Club> => {
-    const response = await fetch(`${API_BASE_URL}/create_club.php`, {
+    const response = await fetch(`${API_BASE_URL}/clubs/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -173,7 +173,7 @@ export const createClub = async (championshipId: string, clubData: any): Promise
 };
 
 export const createPlayer = async (clubId: string, playerData: any): Promise<Player> => {
-    const response = await fetch(`${API_BASE_URL}/create_player.php`, {
+    const response = await fetch(`${API_BASE_URL}/players/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -203,7 +203,7 @@ export const createPlayer = async (clubId: string, playerData: any): Promise<Pla
 };
 
 export const updateClubDetails = async (clubId: string, details: any): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/update_club_details.php`, {
+    const response = await fetch(`${API_BASE_URL}/clubs/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -219,7 +219,7 @@ export const updateClubDetails = async (clubId: string, details: any): Promise<v
 };
 
 export const updatePlayer = async (clubId: string, player: Player): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/update_player.php`, {
+    const response = await fetch(`${API_BASE_URL}/players/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -237,7 +237,7 @@ export const updatePlayer = async (clubId: string, player: Player): Promise<void
 };
 
 export const deletePlayer = async (clubId: string, playerId: string): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/delete_player.php`, {
+    const response = await fetch(`${API_BASE_URL}/players/delete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: playerId })
@@ -261,7 +261,7 @@ export const updateClubRegistrationStatus = async (championshipId: string, clubI
 };
 
 export const createStaff = async (clubId: string, staffData: any): Promise<TechnicalStaff> => {
-    const response = await fetch(`${API_BASE_URL}/create_staff.php`, {
+    const response = await fetch(`${API_BASE_URL}/staff/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ club_id: clubId, ...staffData })
@@ -272,7 +272,7 @@ export const createStaff = async (clubId: string, staffData: any): Promise<Techn
 };
 
 export const updateStaff = async (clubId: string, staff: TechnicalStaff): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/update_staff.php`, {
+    const response = await fetch(`${API_BASE_URL}/staff/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(staff)
@@ -282,7 +282,7 @@ export const updateStaff = async (clubId: string, staff: TechnicalStaff): Promis
 };
 
 export const deleteStaff = async (clubId: string, staffId: string): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/delete_staff.php`, {
+    const response = await fetch(`${API_BASE_URL}/staff/delete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: staffId })
@@ -292,7 +292,7 @@ export const deleteStaff = async (clubId: string, staffId: string): Promise<void
 };
 
 export const createLeague = async (leagueData: any): Promise<League> => {
-    const response = await fetch(`${API_BASE_URL}/create_league.php`, {
+    const response = await fetch(`${API_BASE_URL}/leagues/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -325,7 +325,7 @@ export const createLeague = async (leagueData: any): Promise<League> => {
 };
 
 export const createChampionship = async (leagueId: string, name: string): Promise<Championship> => {
-    const response = await fetch(`${API_BASE_URL}/create_championship.php`, {
+    const response = await fetch(`${API_BASE_URL}/championships/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ league_id: leagueId, name })
@@ -355,7 +355,7 @@ export const createChampionship = async (leagueId: string, name: string): Promis
 };
 
 export const createOfficial = async (leagueId: string, type: string, data: any): Promise<Official> => {
-    const response = await fetch(`${API_BASE_URL}/create_official.php`, {
+    const response = await fetch(`${API_BASE_URL}/officials/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -372,7 +372,7 @@ export const createOfficial = async (leagueId: string, type: string, data: any):
 // API_BASE_URL consolidated at the top
 
 export const updateOfficial = async (type: string, data: Official): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/update_official.php`, {
+    const response = await fetch(`${API_BASE_URL}/officials/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -385,7 +385,7 @@ export const updateOfficial = async (type: string, data: Official): Promise<void
 };
 
 export const deleteOfficial = async (id: string): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/delete_official.php`, {
+    const response = await fetch(`${API_BASE_URL}/officials/delete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id })
@@ -395,7 +395,7 @@ export const deleteOfficial = async (id: string): Promise<void> => {
 };
 
 export const saveFinancials = async (championshipId: string, financials: ChampionshipFinancials): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/save_financials.php`, {
+    const response = await fetch(`${API_BASE_URL}/championships/save_financials`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ championship_id: championshipId, financials })
@@ -408,7 +408,7 @@ export const saveFinancials = async (championshipId: string, financials: Champio
 };
 
 export const updateClubFinePaymentStatus = async (championshipId: string, clubId: string, round: number, isPaid: boolean): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/update_club_fine.php`, {
+    const response = await fetch(`${API_BASE_URL}/fines/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -423,7 +423,7 @@ export const updateClubFinePaymentStatus = async (championshipId: string, clubId
 };
 
 export const updateMatch = async (match: Match): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/update_match.php`, {
+    const response = await fetch(`${API_BASE_URL}/matches/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -470,7 +470,7 @@ export const generateMatches = async (championshipId: string, config: Championsh
     }
 
     // 3. Salvar no servidor
-    const response = await fetch(`${API_BASE_URL}/batch_matches.php`, {
+    const response = await fetch(`${API_BASE_URL}/matches/batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ championship_id: championshipId, matches: matchesToInsert })

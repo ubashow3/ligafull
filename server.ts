@@ -359,7 +359,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/user_register.php', (req, res) => {
+  apiRouter.post('/auth/register', (req, res) => {
     const { full_name, email, password } = req.body;
     const id = Math.random().toString(36).substr(2, 9);
     const hash = bcrypt.hashSync(password, 10);
@@ -382,7 +382,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/user_login.php', (req, res) => {
+  apiRouter.post('/auth/login', (req, res) => {
     const { email, password } = req.body;
     try {
       const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any;
@@ -402,7 +402,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.get('/ads.php', (req, res) => {
+  apiRouter.get('/ads', (req, res) => {
     try {
       const ads = db.prepare('SELECT * FROM ads WHERE active = 1').all();
       res.json(ads);
@@ -411,7 +411,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.get('/posts.php', (req, res) => {
+  apiRouter.get('/posts', (req, res) => {
     const { league_id } = req.query;
     try {
       const posts = db.prepare('SELECT * FROM posts WHERE league_id = ? ORDER BY created_at DESC').all(league_id);
@@ -421,7 +421,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/create_post.php', (req, res) => {
+  apiRouter.post('/posts', (req, res) => {
     const { league_id, title, content, image_url, author_name, author_photo } = req.body;
     const id = Math.random().toString(36).substr(2, 9);
     try {
@@ -435,13 +435,13 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/upload.php', (req, res) => {
+  apiRouter.post('/upload', (req, res) => {
     // For demo purposes, we'll just return a success message and a dummy URL
     // In a real app we'd use multer or similar
     res.json({ success: true, url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800' });
   });
 
-  apiRouter.post('/update_official.php', (req, res) => {
+  apiRouter.post('/officials/update', (req, res) => {
     const { id, name, nickname, cpf, bankAccount, role } = req.body;
     console.log(`Updating official ${id} (${name})`);
     try {
@@ -457,7 +457,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/update_match.php', (req, res) => {
+  apiRouter.post('/matches/update', (req, res) => {
     const { id, homeScore, awayScore, date, location, status, refereeId, assistant1Id, assistant2Id, tableOfficialId, homeLineup, awayLineup, events } = req.body;
     try {
       db.prepare(`
@@ -479,7 +479,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/create_club.php', (req, res) => {
+  apiRouter.post('/clubs/create', (req, res) => {
     const { championship_id, name, abbreviation, logo_url, whatsapp } = req.body;
     const id = Math.random().toString(36).substr(2, 9);
     try {
@@ -492,7 +492,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/create_player.php', (req, res) => {
+  apiRouter.post('/players/create', (req, res) => {
     const { club_id, name, nickname, position, cpf, birth_date, photo_url } = req.body;
     const id = Math.random().toString(36).substr(2, 9);
     try {
@@ -505,7 +505,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/update_player.php', (req, res) => {
+  apiRouter.post('/players/update', (req, res) => {
     const { id, name, nickname, position, cpf, birth_date, photo_url } = req.body;
     try {
       db.prepare('UPDATE players SET name = ?, nickname = ?, position = ?, cpf = ?, birth_date = ?, photo_url = ? WHERE id = ?').run(
@@ -517,7 +517,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/delete_player.php', (req, res) => {
+  apiRouter.post('/players/delete', (req, res) => {
     const { id } = req.body;
     try {
       db.prepare('DELETE FROM players WHERE id = ?').run(id);
@@ -527,7 +527,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/update_club_details.php', (req, res) => {
+  apiRouter.post('/clubs/update', (req, res) => {
       const { id, name, abbreviation, logo_url, whatsapp } = req.body;
       try {
           db.prepare('UPDATE clubs SET name = ?, abbreviation = ?, logo_url = ?, whatsapp = ? WHERE id = ?').run(
@@ -539,7 +539,7 @@ async function startServer() {
       }
   });
 
-  apiRouter.post('/delete_official.php', (req, res) => {
+  apiRouter.post('/officials/delete', (req, res) => {
     const { id } = req.body;
     try {
       db.prepare('DELETE FROM officials WHERE id = ?').run(id);
@@ -549,7 +549,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/save_financials.php', (req, res) => {
+  apiRouter.post('/championships/save_financials', (req, res) => {
     const { championship_id, financials } = req.body;
     console.log(`Saving financials for championship ${championship_id}`);
     try {
@@ -582,7 +582,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/create_staff.php', (req, res) => {
+  apiRouter.post('/staff/create', (req, res) => {
     const { club_id, name, role } = req.body;
     const id = Math.random().toString(36).substr(2, 9);
     try {
@@ -593,7 +593,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/update_staff.php', (req, res) => {
+  apiRouter.post('/staff/update', (req, res) => {
     const { id, name, role } = req.body;
     try {
       db.prepare('UPDATE technical_staff SET name = ?, role = ? WHERE id = ?').run(name, role, id);
@@ -603,7 +603,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/delete_staff.php', (req, res) => {
+  apiRouter.post('/staff/delete', (req, res) => {
     const { id } = req.body;
     try {
       db.prepare('DELETE FROM technical_staff WHERE id = ?').run(id);
@@ -613,7 +613,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/create_league.php', (req, res) => {
+  apiRouter.post('/leagues/create', (req, res) => {
     const { name, slug, logo_url, cover_url, admin_email, city, state } = req.body;
     const id = Math.random().toString(36).substr(2, 9);
     try {
@@ -626,7 +626,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/create_championship.php', (req, res) => {
+  apiRouter.post('/championships/create', (req, res) => {
     const { league_id, name } = req.body;
     const id = Math.random().toString(36).substr(2, 9);
     try {
@@ -637,7 +637,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/create_official.php', (req, res) => {
+  apiRouter.post('/officials/create', (req, res) => {
     const { league_id, type, name, nickname, cpf, bank_account, role } = req.body;
     const id = Math.random().toString(36).substr(2, 9);
     try {
@@ -650,7 +650,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/batch_matches.php', (req, res) => {
+  apiRouter.post('/matches/batch', (req, res) => {
     const { championship_id, matches } = req.body;
     try {
       const deleteStmt = db.prepare('DELETE FROM matches WHERE championship_id = ?');
@@ -671,7 +671,7 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/update_club_fine.php', (req, res) => {
+  apiRouter.post('/fines/update', (req, res) => {
     const { championship_id, club_id, round, is_paid } = req.body;
     console.log(`Updating fine for club ${club_id} in round ${round}`);
     try {
