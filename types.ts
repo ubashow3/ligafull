@@ -1,5 +1,4 @@
 
-
 export interface Player {
   id: string;
   name: string;
@@ -33,6 +32,8 @@ export interface Official {
     nickname?: string;
     cpf?: string;
     bankAccount?: string;
+    type?: 'referee' | 'table_official';
+    role?: string;
 }
 
 export interface MatchEvent {
@@ -57,6 +58,10 @@ export interface Match {
     assistant1?: string;
     assistant2?: string;
     tableOfficial?: string;
+    refereeId?: string;
+    assistant1Id?: string;
+    assistant2Id?: string;
+    tableOfficialId?: string;
     championship_id?: string;
     homeLineup?: { playerId: string; shirtNumber: number | string }[];
     awayLineup?: { playerId: string; shirtNumber: number | string }[];
@@ -77,7 +82,15 @@ export interface Standing {
     points: number;
 }
 
-// FIX: Added ChampionshipFinancials interface to be used in FinancialsTab.tsx
+export interface TopScorer {
+    id: string;
+    name: string;
+    goals: number;
+    clubName: string;
+    clubLogoUrl: string;
+    photoUrl?: string;
+}
+
 export interface ChampionshipFinancials {
     refereeFee: number;
     assistantFee: number;
@@ -87,9 +100,9 @@ export interface ChampionshipFinancials {
     redCardFine: number;
     totalCost: number;
     registrationFeePerClub: number;
+    playerRegistrationDeadline?: string;
     clubPayments?: { [clubId:string]: boolean };
     finePayments?: { [clubId: string]: { [round: number]: boolean } };
-    playerRegistrationDeadline?: string;
     clubAdminTokens?: { [clubId: string]: string };
 }
 
@@ -99,7 +112,31 @@ export interface Championship {
     clubs: Club[];
     matches: Match[];
     standings: Standing[];
+    topScorers: TopScorer[];
     financials?: ChampionshipFinancials;
+}
+
+export interface Post {
+    id: string;
+    user_id: string;
+    user_name: string;
+    user_photo?: string;
+    league_id: string;
+    content: string;
+    media_url?: string;
+    media_type?: 'image' | 'video';
+    created_at: string;
+    is_official?: boolean;
+}
+
+export interface UserProfile {
+    id: string;
+    full_name: string;
+    photo_url?: string;
+    email: string;
+    is_paid: boolean;
+    trial_started_at: string;
+    registered_league_id: string;
 }
 
 export interface League {
@@ -107,6 +144,7 @@ export interface League {
   name: string;
   slug: string;
   logoUrl: string;
+  coverUrl?: string;
   adminEmail: string;
   adminPassword?: string;
   city?: string;
@@ -114,6 +152,7 @@ export interface League {
   referees: Official[];
   tableOfficials: Official[];
   championships: Championship[];
+  posts?: Post[];
 }
 
 export interface ChampionshipWizardConfig {

@@ -117,22 +117,22 @@ const ResultDot: React.FC<{result: 'W' | 'D' | 'L'}> = ({ result }) => {
 
 const MatchResultDisplay: React.FC<{match: Match}> = ({ match }) => (
     <div className="flex items-center justify-center gap-2 text-sm">
-        <img src={match.homeTeam.logoUrl} alt={match.homeTeam.name} className="w-5 h-5 rounded-full object-cover"/>
+        <img src={match.homeTeam.logoUrl || undefined} alt={match.homeTeam.name} className="w-5 h-5 rounded-full object-cover" referrerPolicy="no-referrer"/>
         <span className="font-semibold">{match.homeTeam.abbreviation}</span>
         <span className="font-bold text-white">{match.homeScore} x {match.awayScore}</span>
         <span className="font-semibold">{match.awayTeam.abbreviation}</span>
-        <img src={match.awayTeam.logoUrl} alt={match.awayTeam.name} className="w-5 h-5 rounded-full object-cover"/>
+        <img src={match.awayTeam.logoUrl || undefined} alt={match.awayTeam.name} className="w-5 h-5 rounded-full object-cover" referrerPolicy="no-referrer"/>
     </div>
 );
 
 const NextMatchDisplay: React.FC<{match: Match}> = ({ match }) => (
     <div className="flex flex-col items-center text-sm">
          <div className="flex items-center justify-center gap-2">
-            <img src={match.homeTeam.logoUrl} alt={match.homeTeam.name} className="w-5 h-5 rounded-full object-cover"/>
+            <img src={match.homeTeam.logoUrl || undefined} alt={match.homeTeam.name} className="w-5 h-5 rounded-full object-cover" referrerPolicy="no-referrer"/>
             <span className="font-semibold">{match.homeTeam.abbreviation}</span>
             <span className="font-bold text-white">vs</span>
             <span className="font-semibold">{match.awayTeam.abbreviation}</span>
-            <img src={match.awayTeam.logoUrl} alt={match.awayTeam.name} className="w-5 h-5 rounded-full object-cover"/>
+            <img src={match.awayTeam.logoUrl || undefined} alt={match.awayTeam.name} className="w-5 h-5 rounded-full object-cover" referrerPolicy="no-referrer"/>
         </div>
         <span className="text-xs text-gray-400 mt-1">{new Date(match.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', weekday: 'short' })}</span>
     </div>
@@ -438,14 +438,14 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
         <div className="flex items-start mb-8 gap-4">
             {isEditingClubInfo ? (
                 <div className="relative group">
-                    <img src={editingClubLogoPreview || club.logoUrl} alt={`${club.name} logo`} className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-4 border-gray-700"/>
+                    <img src={editingClubLogoPreview || club.logoUrl} alt={`${club.name} logo`} className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-4 border-gray-700" referrerPolicy="no-referrer"/>
                     <label htmlFor="club-logo-upload" className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-full cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                     </label>
                     <input id="club-logo-upload" type="file" className="hidden" accept="image/*" onChange={(e) => handleFileChange(e, setEditingClubLogoFile, setEditingClubLogoPreview)}/>
                 </div>
             ) : (
-                <img src={club.logoUrl} alt={`${club.name} logo`} className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-4 border-gray-700"/>
+                <img src={club.logoUrl || undefined} alt={`${club.name} logo`} className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-4 border-gray-700" referrerPolicy="no-referrer"/>
             )}
             <div className="flex-grow space-y-2">
                 {isEditingClubInfo ? (
@@ -585,7 +585,7 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
                         </div>
                         <input type="date" value={newPlayerBirthDate} onChange={e => setNewPlayerBirthDate(e.target.value)} className="bg-gray-900 p-2 rounded w-full" placeholder="Data de Nascimento" />
                         <div className="flex items-center gap-4">
-                            {newPlayerPhotoPreview ? <img src={newPlayerPhotoPreview} alt="Prévia" className="w-10 h-10 rounded-full object-cover"/> : <div className="w-10 h-10 rounded-full bg-gray-600"/>}
+                            {newPlayerPhotoPreview ? <img src={newPlayerPhotoPreview} alt="Prévia" className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer"/> : <div className="w-10 h-10 rounded-full bg-gray-600"/>}
                             <input type="file" onChange={(e) => handleFileChange(e, setNewPlayerPhotoFile, setNewPlayerPhotoPreview)} accept="image/*" className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-green-600/20 file:text-green-300 hover:file:bg-green-600/30"/>
                         </div>
                         <select value={newPlayerPosition} onChange={e => setNewPlayerPosition(e.target.value)} required className="bg-gray-900 p-2 rounded w-full">
@@ -609,7 +609,7 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
                                    </div>
                                    <input type="date" value={editingPlayer.birthDate?.split('T')[0] || ''} onChange={e => setEditingPlayer({...editingPlayer, birthDate: e.target.value})} className="bg-gray-700 p-1 rounded w-full" />
                                    <div className="flex items-center gap-4">
-                                       <img src={editingPlayerPhotoPreview || editingPlayer.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt="Prévia" className="w-10 h-10 rounded-full object-cover"/>
+                                       <img src={editingPlayerPhotoPreview || editingPlayer.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt="Prévia" className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer"/>
                                        <input type="file" onChange={(e) => handleFileChange(e, setEditingPlayerPhotoFile, setEditingPlayerPhotoPreview)} accept="image/*" className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-green-600/20 file:text-green-300 hover:file:bg-green-600/30"/>
                                   </div>
                                    <select value={editingPlayer.position} onChange={e => setEditingPlayer({...editingPlayer, position: e.target.value})} className="bg-gray-700 p-1 rounded">
@@ -621,7 +621,7 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
                                 <div>
                                     <div className="flex justify-between items-center">
                                         <div className="flex items-center gap-3">
-                                            <img src={player.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt={player.name} className="w-10 h-10 rounded-full object-cover"/>
+                                            <img src={player.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt={player.name} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer"/>
                                             <div>
                                                 <p className="font-medium text-white">{player.nickname || player.name}</p>
                                                 <p className="text-sm text-gray-400">{player.position}</p>
@@ -703,7 +703,7 @@ const ClubAdminPage: React.FC<ClubAdminPageProps> = ({
         {showInstallPrompt && installPromptEvent && (
             <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 bg-gray-700 p-4 text-white flex items-center justify-between shadow-lg z-50 animate-fade-in-up rounded-lg max-w-md ml-auto">
                 <div className="flex items-center gap-4">
-                    <img src={league.logoUrl} alt="League Logo" className="w-10 h-10 rounded-full flex-shrink-0" />
+                    <img src={league.logoUrl || undefined} alt="League Logo" className="w-10 h-10 rounded-full flex-shrink-0" referrerPolicy="no-referrer" />
                     <div>
                         <p className="font-bold">Acesso Rápido!</p>
                         <p className="text-sm text-gray-300">Instale o app para facilitar o acesso.</p>

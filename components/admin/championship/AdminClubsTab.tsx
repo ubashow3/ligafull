@@ -133,22 +133,22 @@ const ResultDot: React.FC<{result: 'W' | 'D' | 'L'}> = ({ result }) => {
 
 const MatchResultDisplay: React.FC<{match: Match}> = ({ match }) => (
     <div className="flex items-center justify-center gap-2 text-sm">
-        <img src={match.homeTeam.logoUrl} alt={match.homeTeam.name} className="w-5 h-5 rounded-full object-cover"/>
+        <img src={match.homeTeam.logoUrl} alt={match.homeTeam.name} className="w-5 h-5 rounded-full object-cover" referrerPolicy="no-referrer"/>
         <span className="font-semibold">{match.homeTeam.abbreviation}</span>
         <span className="font-bold text-white">{match.homeScore} x {match.awayScore}</span>
         <span className="font-semibold">{match.awayTeam.abbreviation}</span>
-        <img src={match.awayTeam.logoUrl} alt={match.awayTeam.name} className="w-5 h-5 rounded-full object-cover"/>
+        <img src={match.awayTeam.logoUrl} alt={match.awayTeam.name} className="w-5 h-5 rounded-full object-cover" referrerPolicy="no-referrer"/>
     </div>
 );
 
 const NextMatchDisplay: React.FC<{match: Match}> = ({ match }) => (
     <div className="flex flex-col items-center text-sm">
          <div className="flex items-center justify-center gap-2">
-            <img src={match.homeTeam.logoUrl} alt={match.homeTeam.name} className="w-5 h-5 rounded-full object-cover"/>
+            <img src={match.homeTeam.logoUrl} alt={match.homeTeam.name} className="w-5 h-5 rounded-full object-cover" referrerPolicy="no-referrer"/>
             <span className="font-semibold">{match.homeTeam.abbreviation}</span>
             <span className="font-bold text-white">vs</span>
             <span className="font-semibold">{match.awayTeam.abbreviation}</span>
-            <img src={match.awayTeam.logoUrl} alt={match.awayTeam.name} className="w-5 h-5 rounded-full object-cover"/>
+            <img src={match.awayTeam.logoUrl} alt={match.awayTeam.name} className="w-5 h-5 rounded-full object-cover" referrerPolicy="no-referrer"/>
         </div>
         <span className="text-xs text-gray-400 mt-1">{new Date(match.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', weekday: 'short' })}</span>
     </div>
@@ -476,7 +476,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
           <input type="text" value={newClubName} onChange={(e) => setNewClubName(e.target.value)} placeholder="Nome do Clube" required className="w-full bg-gray-800 border-gray-600 rounded p-2 text-white"/>
           <input type="text" value={newClubAbbr} onChange={(e) => setNewClubAbbr(e.target.value)} placeholder="Abreviação (3 letras)" maxLength={3} required className="w-full bg-gray-800 border-gray-600 rounded p-2 text-white"/>
            <div className="flex items-center gap-4">
-                {newClubLogoPreview ? <img src={newClubLogoPreview} alt="Prévia" className="w-12 h-12 rounded-full object-cover"/> : <div className="w-12 h-12 rounded-full bg-gray-600"/>}
+                {newClubLogoPreview ? <img src={newClubLogoPreview} alt="Prévia" className="w-12 h-12 rounded-full object-cover" referrerPolicy="no-referrer"/> : <div className="w-12 h-12 rounded-full bg-gray-600"/>}
                 <input type="file" onChange={(e) => handleFileChange(e, setNewClubLogoFile, setNewClubLogoPreview)} accept="image/*" className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-600/20 file:text-green-300 hover:file:bg-green-600/30"/>
            </div>
           <input 
@@ -536,7 +536,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
             <div key={club.id} className="bg-gray-700/50 rounded-lg overflow-hidden">
                 <div className="p-4 flex items-center justify-between">
                     <div className="flex items-center cursor-pointer flex-grow" onClick={() => toggleClub(club.id)}>
-                        <img src={club.logoUrl} alt={club.name} className="w-12 h-12 rounded-full mr-4 object-cover" />
+                        <img src={club.logoUrl} alt={club.name} className="w-12 h-12 rounded-full mr-4 object-cover" referrerPolicy="no-referrer" />
                         <span className="font-bold text-lg text-white">{club.name} ({club.abbreviation})</span>
                     </div>
                     <div className="flex items-center gap-4 flex-shrink-0">
@@ -560,7 +560,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                                 <div>
                                     <label className="block text-sm font-medium text-gray-300 mb-1">Logo do Clube</label>
                                     <div className="flex items-center gap-4">
-                                        <img src={editingClubLogoPreview || club.logoUrl || `https://i.pravatar.cc/150?u=${club.id}`} alt="Prévia" className="w-12 h-12 rounded-full object-cover"/>
+                                        <img src={editingClubLogoPreview || club.logoUrl || `https://i.pravatar.cc/150?u=${club.id}`} alt="Prévia" className="w-12 h-12 rounded-full object-cover" referrerPolicy="no-referrer"/>
                                         <input type="file" onChange={(e) => handleFileChange(e, setEditingClubLogoFile, setEditingClubLogoPreview)} accept="image/*" className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-600/20 file:text-green-300 hover:file:bg-green-600/30"/>
                                     </div>
                                 </div>
@@ -628,7 +628,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                             </div>
                             <input type="date" value={newPlayerBirthDate} onChange={e => setNewPlayerBirthDate(e.target.value)} className="bg-gray-900 p-1 rounded w-full text-sm" placeholder="Data de Nascimento" />
                             <div className="flex items-center gap-4">
-                                    {newPlayerPhotoPreview ? <img src={newPlayerPhotoPreview} alt="Prévia" className="w-10 h-10 rounded-full object-cover"/> : <div className="w-10 h-10 rounded-full bg-gray-600"/>}
+                                    {newPlayerPhotoPreview ? <img src={newPlayerPhotoPreview} alt="Prévia" className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer"/> : <div className="w-10 h-10 rounded-full bg-gray-600"/>}
                                     <input type="file" onChange={(e) => handleFileChange(e, setNewPlayerPhotoFile, setNewPlayerPhotoPreview)} accept="image/*" className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-600/20 file:text-green-300 hover:file:bg-green-600/30"/>
                             </div>
                             <select value={newPlayerPosition} onChange={e => setNewPlayerPosition(e.target.value)} required className="bg-gray-900 p-1 rounded w-full text-sm">
@@ -652,7 +652,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                                         </div>
                                         <input type="date" value={editingPlayer.birthDate?.split('T')[0] || ''} onChange={e => setEditingPlayer({...editingPlayer, birthDate: e.target.value})} className="bg-gray-700 p-1 rounded text-sm w-full" />
                                         <div className="flex items-center gap-4">
-                                            <img src={editingPlayerPhotoPreview || editingPlayer.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt="Prévia" className="w-10 h-10 rounded-full object-cover"/>
+                                            <img src={editingPlayerPhotoPreview || editingPlayer.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt="Prévia" className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer"/>
                                             <input type="file" onChange={(e) => handleFileChange(e, setEditingPlayerPhotoFile, setEditingPlayerPhotoPreview)} accept="image/*" className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-600/20 file:text-green-300 hover:file:bg-green-600/30"/>
                                     </div>
                                         <select value={editingPlayer.position} onChange={e => setEditingPlayer({...editingPlayer, position: e.target.value})} className="bg-gray-700 p-1 rounded text-sm">
@@ -664,7 +664,7 @@ const AdminClubsTab: React.FC<AdminClubsTabProps> = ({
                                     <>
                                     <div className="flex justify-between items-start">
                                         <div className="flex-grow flex items-center gap-3 cursor-pointer" onClick={(e) => { e.stopPropagation(); onPlayerClick(player); }}>
-                                            <img src={player.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt={player.name} className="w-8 h-8 rounded-full object-cover"/>
+                                            <img src={player.photoUrl || `https://i.pravatar.cc/150?u=${player.id}`} alt={player.name} className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer"/>
                                             <div>
                                                 <span className="font-medium text-white">{player.nickname || player.name}</span>
                                                 <span className="text-gray-400 text-xs ml-2">({player.position})</span>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { League } from '../types';
 
@@ -69,9 +70,10 @@ const HomePage: React.FC<HomePageProps> = ({ leagues, onSelectLeague }) => {
   return (
     <div className="animate-fade-in">
       <div className="text-center mb-12">
-        <h1 className="text-4xl md:text-5xl font-extrabold text-green-400">Bem-vindo ao LigaFull futebol digital</h1>
-        <p className="mt-2 text-lg text-gray-300">Sua plataforma para gerenciamento de campeonatos de futebol.</p>
-        <p className="mt-2 text-md text-gray-400">Para criar sua própria liga, clique na engrenagem no canto superior direito!</p>
+        <h1 className="text-4xl md:text-5xl font-extrabold text-green-400">LigaFull</h1>
+        <p className="text-white text-xl font-bold italic mt-1 mb-4 tracking-wider">é bola na rede!</p>
+        <p className="mt-2 text-lg text-gray-300">A maior plataforma de gerenciamento social do futebol amador.</p>
+        <p className="mt-2 text-md text-gray-400 italic">Explore ligas, veja a resenha e participe da comunidade.</p>
       </div>
 
       <div className="max-w-4xl mx-auto mb-8 p-4 bg-gray-800/50 rounded-lg">
@@ -117,10 +119,10 @@ const HomePage: React.FC<HomePageProps> = ({ leagues, onSelectLeague }) => {
           filteredLeagues.map(league => (
             <div 
               key={league.id} 
-              className="bg-gray-800 rounded-lg shadow-lg overflow-hidden cursor-pointer group flex items-center transition-all duration-300 hover:bg-gray-700 hover:shadow-xl"
+              className="bg-gray-800 rounded-lg shadow-lg overflow-hidden cursor-pointer group flex items-center transition-all duration-300 hover:bg-gray-700 hover:shadow-xl border border-transparent hover:border-green-500/30"
               onClick={() => onSelectLeague(league)}
             >
-              <img src={league.logoUrl} alt={`${league.name} logo`} className="w-24 h-24 sm:w-32 sm:h-32 object-cover flex-shrink-0" />
+              <img src={league.logoUrl || undefined} alt={`${league.name} logo`} className="w-24 h-24 sm:w-32 sm:h-32 object-cover flex-shrink-0" referrerPolicy="no-referrer" />
               <div className="p-4 sm:p-6">
                 <h2 className="text-xl sm:text-2xl font-bold text-white group-hover:text-green-400 transition-colors duration-300 flex items-center gap-2">
                     {league.name}

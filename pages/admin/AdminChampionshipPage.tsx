@@ -25,7 +25,7 @@ interface AdminChampionshipPageProps {
   onBack: () => void;
   onSelectMatch: (match: Match) => void;
   onCreateClub: (name: string, abbreviation: string, logoUrl: string, whatsapp: string) => void;
-  onUpdateMatch: (updatedMatch: Match) => void;
+  onUpdateMatch: (updatedMatch: Match) => Promise<void>;
   onNavigateToCreateMatches: () => void;
   onSaveFinancials: (championshipId: string, financials: ChampionshipFinancials) => void;
   onUpdateClubRegistrationStatus: (championshipId: string, clubId: string, isPaid: boolean) => void;
@@ -62,16 +62,6 @@ const AdminChampionshipPage: React.FC<AdminChampionshipPageProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('clubs');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-
-  const topScorers = useMemo(() => {
-    const allPlayers = championship.clubs.flatMap(club =>
-      club.players.map(player => ({ ...player, clubName: club.name, clubLogoUrl: club.logoUrl }))
-    );
-    return allPlayers
-      .filter(player => player.goals > 0)
-      .sort((a, b) => b.goals - a.goals)
-      .slice(0, 10);
-  }, [championship.clubs]);
 
   return (
     <div className="animate-fade-in">
@@ -133,7 +123,7 @@ const AdminChampionshipPage: React.FC<AdminChampionshipPageProps> = ({
             />
         )}
         {activeTab === 'standings' && <AdminStandingsTab standings={championship.standings} />}
-        {activeTab === 'top_scorers' && <AdminTopScorersTab topScorers={topScorers} />}
+        {activeTab === 'top_scorers' && <AdminTopScorersTab topScorers={championship.topScorers} />}
         {activeTab === 'financials' && (
             <AdminFinancialsTab 
                 championship={championship}

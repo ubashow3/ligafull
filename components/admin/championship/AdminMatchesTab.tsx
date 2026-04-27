@@ -7,7 +7,7 @@ interface AdminMatchesTabProps {
   onSelectMatch: (match: Match) => void;
   championshipId: string;
   league: League;
-  onUpdateMatch: (updatedMatch: Match) => void;
+  onUpdateMatch: (updatedMatch: Match) => Promise<void>;
   clubs: Club[];
   onNavigateToCreateMatches: () => void;
 }
@@ -67,6 +67,7 @@ const AdminMatchesTab: React.FC<AdminMatchesTabProps> = ({ matches, onSelectMatc
     <div className="animate-fade-in">
       {matchToEdit && (
         <EditGameDetailsModal 
+            key={matchToEdit.id}
             isOpen={isEditModalOpen}
             onClose={() => setIsEditModalOpen(false)}
             match={matchToEdit}

@@ -84,22 +84,22 @@ const ResultDot: React.FC<{result: 'W' | 'D' | 'L'}> = ({ result }) => {
 
 const MatchResultDisplay: React.FC<{match: Match}> = ({ match }) => (
     <div className="flex items-center justify-center gap-2 text-sm">
-        <img src={match.homeTeam.logoUrl} alt={match.homeTeam.name} className="w-5 h-5 rounded-full object-cover"/>
+        <img src={match.homeTeam.logoUrl || undefined} alt={match.homeTeam.name} className="w-5 h-5 rounded-full object-cover"/>
         <span className="font-semibold">{match.homeTeam.abbreviation}</span>
         <span className="font-bold text-white">{match.homeScore} x {match.awayScore}</span>
         <span className="font-semibold">{match.awayTeam.abbreviation}</span>
-        <img src={match.awayTeam.logoUrl} alt={match.awayTeam.name} className="w-5 h-5 rounded-full object-cover"/>
+        <img src={match.awayTeam.logoUrl || undefined} alt={match.awayTeam.name} className="w-5 h-5 rounded-full object-cover"/>
     </div>
 );
 
 const NextMatchDisplay: React.FC<{match: Match}> = ({ match }) => (
     <div className="flex flex-col items-center text-sm">
          <div className="flex items-center justify-center gap-2">
-            <img src={match.homeTeam.logoUrl} alt={match.homeTeam.name} className="w-5 h-5 rounded-full object-cover"/>
+            <img src={match.homeTeam.logoUrl || undefined} alt={match.homeTeam.name} className="w-5 h-5 rounded-full object-cover"/>
             <span className="font-semibold">{match.homeTeam.abbreviation}</span>
             <span className="font-bold text-white">vs</span>
             <span className="font-semibold">{match.awayTeam.abbreviation}</span>
-            <img src={match.awayTeam.logoUrl} alt={match.awayTeam.name} className="w-5 h-5 rounded-full object-cover"/>
+            <img src={match.awayTeam.logoUrl || undefined} alt={match.awayTeam.name} className="w-5 h-5 rounded-full object-cover"/>
         </div>
         <span className="text-xs text-gray-400 mt-1">{new Date(match.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', weekday: 'short' })}</span>
     </div>
@@ -257,7 +257,7 @@ const ClubsTab: React.FC<ClubsTabProps> = ({ clubs, championship, isAdminMode, o
                 onClick={() => toggleClub(club.id)}
               >
                 <div className="flex items-center">
-                  <img src={club.logoUrl} alt={club.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover mr-4" />
+                  <img src={club.logoUrl || undefined} alt={club.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover mr-4" />
                   <span className="font-bold text-base sm:text-lg text-white">{club.name} ({club.abbreviation})</span>
                 </div>
                 <svg 

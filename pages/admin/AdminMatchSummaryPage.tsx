@@ -6,7 +6,7 @@ interface AdminMatchSummaryPageProps {
   league: League;
   championship: Championship;
   onBack: () => void;
-  onUpdateMatch: (updatedMatch: Match) => void;
+  onUpdateMatch: (updatedMatch: Match) => Promise<void>;
 }
 
 const AdminMatchSummaryPage: React.FC<AdminMatchSummaryPageProps> = ({ match, league, championship, onBack, onUpdateMatch }) => {
@@ -73,18 +73,26 @@ const AdminMatchSummaryPage: React.FC<AdminMatchSummaryPageProps> = ({ match, le
     }));
   };
   
-  const handleSaveDraft = () => {
-    onUpdateMatch(editableMatch);
-    alert('Rascunho salvo com sucesso!');
+  const handleSaveDraft = async () => {
+    try {
+      await onUpdateMatch(editableMatch);
+      alert('Rascunho salvo com sucesso!');
+    } catch (error) {
+      // O erro já é tratado no handleUpdateMatch do App.tsx, mas podemos adicionar lógica aqui se necessário
+    }
   };
 
-  const handleFinalizeMatch = () => {
+  const handleFinalizeMatch = async () => {
     if (window.confirm('Você tem certeza que deseja FINALIZAR esta partida? Esta ação é permanente.')) {
         if (window.confirm('CONFIRMAÇÃO FINAL: Uma vez finalizada, a súmula não poderá ser alterada. Continuar?')) {
             const matchToSave = { ...editableMatch, status: 'finished' as const };
-            onUpdateMatch(matchToSave);
-            setEditableMatch(matchToSave);
-            alert('Partida finalizada com sucesso!');
+            try {
+              await onUpdateMatch(matchToSave);
+              setEditableMatch(matchToSave);
+              alert('Partida finalizada com sucesso!');
+            } catch (error) {
+              // Erro já tratado
+            }
         }
     }
   };

@@ -1,6 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
+import { UserProfile } from '../types';
 import * as leagueService from '../services/leagueService';
 
 interface IBGEState {
@@ -16,14 +17,15 @@ interface IBGECity {
 
 interface CreateLeaguePageProps {
   onBack: () => void;
-  onCreateLeague: (name: string, logoUrl: string, email: string, password: string, state: string, city: string) => void;
-  isLoading: boolean;
+  onLeagueCreated: () => void;
+  user: UserProfile | null;
 }
 
-const CreateLeaguePage: React.FC<CreateLeaguePageProps> = ({ onBack, onCreateLeague, isLoading }) => {
+const CreateLeaguePage: React.FC<CreateLeaguePageProps> = ({ onBack, onLeagueCreated, user }) => {
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(user?.email || '');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [states, setStates] = useState<IBGEState[]>([]);
   const [cities, setCities] = useState<IBGECity[]>([]);
   const [selectedState, setSelectedState] = useState('');
@@ -72,17 +74,38 @@ const CreateLeaguePage: React.FC<CreateLeaguePageProps> = ({ onBack, onCreateLea
       return;
     }
     
-    let uploadedLogoUrl = '';
-    if (logoFile) {
-        try {
-            uploadedLogoUrl = await leagueService.uploadImage(logoFile);
-        } catch (error) {
-            alert(`Erro ao fazer upload do logo: ${(error as Error).message}`);
-            return; 
+    setIsLoading(true);
+    try {
+        let uploadedLogoUrl = '';
+        if (logoFile) {
+            try {
+                uploadedLogoUrl = await leagueService.uploadImage(logoFile);
+            } catch (error) {
+                alert(`Erro ao fazer upload do logo: ${(error as Error).message}`);
+                setIsLoading(false);
+                return; 
+            }
         }
-    }
 
-    onCreateLeague(name.trim(), uploadedLogoUrl, email.trim(), password.trim(), selectedState, selectedCity);
+        const slug = name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+        
+        await leagueService.createLeague({
+            name: name.trim(),
+            slug,
+            logo_url: uploadedLogoUrl,
+            admin_email: email.trim(),
+            admin_password: password.trim(),
+            city: selectedCity,
+            state: selectedState
+        });
+
+        alert('Liga criada com sucesso!');
+        onLeagueCreated();
+    } catch (error: any) {
+        alert(`Erro ao criar liga: ${error.message}`);
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   return (

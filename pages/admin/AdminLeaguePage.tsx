@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { League, Championship, Official } from '../../types';
 import ManageOfficialsTab from '../../components/admin/league/ManageOfficialsTab';
+import LeagueFinancialsTab from '../../components/admin/league/LeagueFinancialsTab';
 
 interface AdminLeaguePageProps {
   league: League;
@@ -11,7 +12,7 @@ interface AdminLeaguePageProps {
   onDeleteOfficial: (type: 'referees' | 'tableOfficials', id: string) => void;
 }
 
-type ActiveTab = 'championships' | 'referees' | 'tableOfficials';
+type ActiveTab = 'championships' | 'referees' | 'tableOfficials' | 'financials';
 
 // Moved to top level to prevent re-creation on render
 const TabButton: React.FC<{tabName: ActiveTab, label: string, activeTab: ActiveTab, onClick: (tab: ActiveTab) => void}> = ({ tabName, label, activeTab, onClick }) => (
@@ -46,7 +47,7 @@ const AdminLeaguePage: React.FC<AdminLeaguePageProps> = ({
   return (
     <div className="animate-fade-in">
       <div className="flex items-center mb-8">
-        <img src={league.logoUrl} alt={`${league.name} logo`} className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover mr-4 sm:mr-6 border-4 border-gray-700"/>
+        <img src={league.logoUrl || undefined} alt={`${league.name} logo`} className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover mr-4 sm:mr-6 border-4 border-gray-700" referrerPolicy="no-referrer" />
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-white">{league.name}</h1>
           <p className="text-gray-400">Painel do Administrador</p>
@@ -58,6 +59,7 @@ const AdminLeaguePage: React.FC<AdminLeaguePageProps> = ({
           <TabButton tabName="championships" label="Campeonatos" activeTab={activeTab} onClick={setActiveTab} />
           <TabButton tabName="referees" label="Árbitros" activeTab={activeTab} onClick={setActiveTab} />
           <TabButton tabName="tableOfficials" label="Mesários" activeTab={activeTab} onClick={setActiveTab} />
+          <TabButton tabName="financials" label="Financeiro" activeTab={activeTab} onClick={setActiveTab} />
         </nav>
       </div>
       
@@ -126,6 +128,9 @@ const AdminLeaguePage: React.FC<AdminLeaguePageProps> = ({
                 onUpdate={(data) => onUpdateOfficial('tableOfficials', data)}
                 onDelete={(id) => onDeleteOfficial('tableOfficials', id)}
             />
+        )}
+        {activeTab === 'financials' && (
+            <LeagueFinancialsTab league={league} />
         )}
       </div>
     </div>

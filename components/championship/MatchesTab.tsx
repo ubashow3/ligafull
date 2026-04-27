@@ -109,14 +109,14 @@ const MatchesTab: React.FC<MatchesTabProps> = ({ matches, isAdminMode, onSelectM
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex flex-col items-center text-center w-2/5">
-                  <img src={match.homeTeam.logoUrl} alt={match.homeTeam.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full mb-2 object-cover" />
+                  <img src={match.homeTeam.logoUrl || undefined} alt={match.homeTeam.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full mb-2 object-cover" />
                   <span className="font-bold text-sm sm:text-base text-white">{match.homeTeam.name}</span>
                 </div>
                 <div className="text-xl sm:text-2xl font-bold text-white text-center">
                   {match.homeScore != null && match.awayScore != null ? `${match.homeScore} x ${match.awayScore}` : 'x'}
                 </div>
                 <div className="flex flex-col items-center text-center w-2/5">
-                  <img src={match.awayTeam.logoUrl} alt={match.awayTeam.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full mb-2 object-cover" />
+                  <img src={match.awayTeam.logoUrl || undefined} alt={match.awayTeam.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full mb-2 object-cover" />
                   <span className="font-bold text-sm sm:text-base text-white">{match.awayTeam.name}</span>
                 </div>
               </div>

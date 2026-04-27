@@ -33,7 +33,7 @@ const AdminStandingsTab: React.FC<AdminStandingsTabProps> = ({ standings }) => {
               <td className="px-2 py-3 sm:p-3 text-center font-medium">{index + 1}</td>
               <td className="px-2 py-3 sm:p-3 text-left font-medium text-white">
                 <div className="flex items-center">
-                  <img src={team.clubLogoUrl} alt={team.clubName} className="w-6 h-6 rounded-full mr-2 object-cover" />
+                  <img src={team.clubLogoUrl} alt={team.clubName} className="w-6 h-6 rounded-full mr-2 object-cover" referrerPolicy="no-referrer" />
                   <span>{team.clubAbbreviation}</span>
                 </div>
               </td>

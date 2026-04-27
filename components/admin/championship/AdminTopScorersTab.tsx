@@ -35,12 +35,12 @@ const AdminTopScorersTab: React.FC<AdminTopScorersTabProps> = ({ topScorers }) =
             <tr key={scorer.id} className="hover:bg-gray-600/50">
               <td className="px-2 py-3 sm:p-3 text-center font-medium">{index + 1}</td>
               <td className="px-1 py-3 sm:p-3">
-                 <img src={scorer.photoUrl || `https://i.pravatar.cc/150?u=${scorer.id}`} alt={scorer.name} className="w-8 h-8 rounded-full object-cover" />
+                 <img src={scorer.photoUrl || `https://i.pravatar.cc/150?u=${scorer.id}`} alt={scorer.name} className="w-8 h-8 rounded-full object-cover" referrerPolicy="no-referrer" />
               </td>
               <td className="px-2 py-3 sm:p-3 font-medium text-white text-sm sm:text-base">{scorer.name}</td>
               <td className="px-2 py-3 sm:p-3">
                 <div className="flex items-center justify-center">
-                  <img src={scorer.clubLogoUrl} alt={scorer.clubName} className="w-6 h-6 rounded-full object-cover" />
+                  <img src={scorer.clubLogoUrl} alt={scorer.clubName} className="w-6 h-6 rounded-full object-cover" referrerPolicy="no-referrer" />
                 </div>
               </td>
               <td className="px-2 py-3 sm:p-3 text-center font-bold text-white text-base sm:text-lg">{scorer.goals}</td>

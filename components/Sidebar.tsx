@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { League } from '../types';
 
@@ -37,8 +38,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, leagues, onSelectLea
             </svg>
           </button>
         </div>
-        <nav className="p-4">
-          <ul className="space-y-2">
+        
+        <nav className="p-4 flex flex-col h-[calc(100%-64px)]">
+          <ul className="space-y-2 flex-grow overflow-y-auto no-scrollbar">
             {leagues.map(league => (
               <li key={league.id}>
                 <a
@@ -46,12 +48,19 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, leagues, onSelectLea
                   onClick={(e) => handleLeagueClick(e, league)}
                   className="flex items-center p-3 rounded-lg hover:bg-gray-700 transition-colors"
                 >
-                  <img src={league.logoUrl} alt={league.name} className="w-8 h-8 rounded-full mr-3 object-cover flex-shrink-0" />
+                  <img src={league.logoUrl || undefined} alt={league.name} className="w-8 h-8 rounded-full mr-3 object-cover flex-shrink-0" />
                   <span className="text-white font-medium">{league.name}</span>
                 </a>
               </li>
             ))}
           </ul>
+
+          {/* Ad Space in Sidebar */}
+          <div className="mt-auto p-4 bg-gray-900 rounded-xl border border-gray-700">
+             <span className="text-[8px] text-gray-500 font-bold uppercase block mb-2">Espaço Patrocinado</span>
+             <img src="https://logodownload.org/wp-content/uploads/2014/07/adidas-logo-0.png" className="w-12 mx-auto filter grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all cursor-pointer" alt="Adidas" />
+             <p className="text-[10px] text-gray-400 text-center mt-2 font-medium">Equipamento profissional para sua liga.</p>
+          </div>
         </nav>
       </div>
     </div>

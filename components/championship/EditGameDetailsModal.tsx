@@ -11,16 +11,29 @@ interface EditGameDetailsModalProps {
 }
 
 const EditGameDetailsModal: React.FC<EditGameDetailsModalProps> = ({ isOpen, onClose, match, league, onSave, championshipClubs }) => {
-  const [details, setDetails] = useState({
-    location: match.location,
-    date: match.date.split('T')[0],
-    time: new Date(match.date).toTimeString().slice(0, 5),
-    referee: match.referee || '',
-    assistant1: match.assistant1 || '',
-    assistant2: match.assistant2 || '',
-    tableOfficial: match.tableOfficial || '',
-    homeTeamId: match.homeTeam.id,
-    awayTeamId: match.awayTeam.id,
+  const [details, setDetails] = useState(() => {
+    let datePart = '';
+    let timePart = '00:00';
+    
+    if (match.date) {
+      const parts = match.date.split(/[T ]/);
+      datePart = parts[0];
+      if (parts[1]) {
+        timePart = parts[1].slice(0, 5);
+      }
+    }
+
+    return {
+      location: match.location,
+      date: datePart,
+      time: timePart,
+      refereeId: match.refereeId || '',
+      assistant1Id: match.assistant1Id || '',
+      assistant2Id: match.assistant2Id || '',
+      tableOfficialId: match.tableOfficialId || '',
+      homeTeamId: match.homeTeam.id,
+      awayTeamId: match.awayTeam.id,
+    };
   });
 
   const isPlayoffMatch = useMemo(() => {
@@ -47,18 +60,22 @@ const EditGameDetailsModal: React.FC<EditGameDetailsModalProps> = ({ isOpen, onC
       awayTeam,
       location: details.location,
       date: `${details.date}T${details.time}:00`,
-      referee: details.referee,
-      assistant1: details.assistant1,
-      assistant2: details.assistant2,
-      tableOfficial: details.tableOfficial,
+      refereeId: details.refereeId,
+      assistant1Id: details.assistant1Id,
+      assistant2Id: details.assistant2Id,
+      tableOfficialId: details.tableOfficialId,
+      referee: league.referees.find(r => r.id === details.refereeId)?.name || '',
+      assistant1: league.referees.find(r => r.id === details.assistant1Id)?.name || '',
+      assistant2: league.referees.find(r => r.id === details.assistant2Id)?.name || '',
+      tableOfficial: league.tableOfficials.find(r => r.id === details.tableOfficialId)?.name || '',
     };
     onSave(updatedMatch);
   };
   
-  const renderRefereeOptions = (currentSelection?: string) => {
-      const otherReferees = [details.referee, details.assistant1, details.assistant2].filter(a => a && a !== currentSelection);
+  const renderRefereeOptions = (currentSelectionId?: string) => {
+      const otherRefereeIds = [details.refereeId, details.assistant1Id, details.assistant2Id].filter(id => id && id !== currentSelectionId);
       return league.referees.map(r => (
-          <option key={r.id} value={r.name} disabled={otherReferees.includes(r.name)}>{r.name}</option>
+          <option key={r.id} value={r.id} disabled={otherRefereeIds.includes(r.id)}>{r.name}</option>
       ));
   };
 
@@ -108,32 +125,32 @@ const EditGameDetailsModal: React.FC<EditGameDetailsModalProps> = ({ isOpen, onC
             </div>
             <div>
                 <label className="block text-sm font-medium text-gray-300">Árbitro</label>
-                <select name="referee" value={details.referee} onChange={handleChange} className="mt-1 w-full bg-gray-700 border border-gray-600 rounded p-2 text-white">
+                <select name="refereeId" value={details.refereeId} onChange={handleChange} className="mt-1 w-full bg-gray-700 border border-gray-600 rounded p-2 text-white">
                     <option value="">Não definido</option>
-                    {renderRefereeOptions(details.referee)}
+                    {renderRefereeOptions(details.refereeId)}
                 </select>
             </div>
             <div className="grid grid-cols-2 gap-4">
                  <div>
                     <label className="block text-sm font-medium text-gray-300">Assistente 1</label>
-                    <select name="assistant1" value={details.assistant1} onChange={handleChange} className="mt-1 w-full bg-gray-700 border border-gray-600 rounded p-2 text-white">
+                    <select name="assistant1Id" value={details.assistant1Id} onChange={handleChange} className="mt-1 w-full bg-gray-700 border border-gray-600 rounded p-2 text-white">
                         <option value="">Não definido</option>
-                        {renderRefereeOptions(details.assistant1)}
+                        {renderRefereeOptions(details.assistant1Id)}
                     </select>
                 </div>
                  <div>
                     <label className="block text-sm font-medium text-gray-300">Assistente 2</label>
-                    <select name="assistant2" value={details.assistant2} onChange={handleChange} className="mt-1 w-full bg-gray-700 border border-gray-600 rounded p-2 text-white">
+                    <select name="assistant2Id" value={details.assistant2Id} onChange={handleChange} className="mt-1 w-full bg-gray-700 border border-gray-600 rounded p-2 text-white">
                         <option value="">Não definido</option>
-                        {renderRefereeOptions(details.assistant2)}
+                        {renderRefereeOptions(details.assistant2Id)}
                     </select>
                 </div>
             </div>
              <div>
                 <label className="block text-sm font-medium text-gray-300">Mesário</label>
-                <select name="tableOfficial" value={details.tableOfficial} onChange={handleChange} className="mt-1 w-full bg-gray-700 border border-gray-600 rounded p-2 text-white">
+                <select name="tableOfficialId" value={details.tableOfficialId} onChange={handleChange} className="mt-1 w-full bg-gray-700 border border-gray-600 rounded p-2 text-white">
                     <option value="">Não definido</option>
-                    {league.tableOfficials.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                    {league.tableOfficials.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
             </div>
         </div>

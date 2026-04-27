@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -6,6 +7,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LigaFull futebol digital</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google APIs para Upload Direto YouTube -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
     <style type="text/tailwindcss">
       @layer utilities {
         .animate-fade-in {
@@ -31,6 +35,18 @@
           to { opacity: 1; transform: translateY(0); }
         }
       }
+      .youtube-progress-bar {
+        height: 6px;
+        background: #2d2d2d;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .youtube-progress-fill {
+        height: 100%;
+        background: #ff0000;
+        box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+        transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      }
     </style>
   <script type="importmap">
 {
@@ -38,11 +54,11 @@
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.28.0",
-    "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm"
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.28.0"
   }
 }
 </script>
+<link rel="stylesheet" href="/index.css">
 </head>
   <body class="bg-gray-900 text-gray-200 font-sans">
     <div id="root"></div>
