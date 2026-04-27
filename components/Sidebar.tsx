@@ -10,6 +10,7 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, leagues, onSelectLeague }) => {
+  if (!isOpen) return null;
 
   const handleLeagueClick = (e: React.MouseEvent, league: League) => {
     e.preventDefault();

@@ -5,47 +5,108 @@ interface AdminModalProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigateToCreateLeague: () => void;
+  onLogin: (email: string, pass: string) => void;
   user: UserProfile | null;
 }
 
-const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, onNavigateToCreateLeague, user }) => {
+const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose, onNavigateToCreateLeague, onLogin, user }) => {
+  const [activeTab, setActiveTab] = useState<'login' | 'create'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
   if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onLogin(email, password);
+  };
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 animate-fade-in" 
+      className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 animate-fade-in backdrop-blur-sm" 
       onClick={onClose}
     >
       <div 
-        className="bg-gray-800 rounded-lg shadow-xl p-6 sm:p-8 w-full max-w-md mx-4" 
+        className="bg-gray-800 rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-md mx-4 border border-gray-700" 
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex justify-between items-start mb-4">
-            <h2 className="text-xl font-bold text-white">Criar Nova Liga</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-white">&times;</button>
+        <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-black text-white italic tracking-tighter">
+                PANEL <span className="text-green-500">ADMIN</span>
+            </h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors bg-gray-700/50 p-2 rounded-full">&times;</button>
         </div>
-        <div className="space-y-4 text-gray-300">
-            <p>Você está prestes a iniciar o processo de criação de uma nova liga no <strong>LigaFull</strong>.</p>
-            <div className="bg-yellow-900/30 border-l-4 border-yellow-500 p-4 text-sm">
-                <p className="font-bold text-yellow-500 mb-1">Aviso Importante:</p>
-                <p>A criação e manutenção de uma liga profissional pode envolver custos de hospedagem, processamento de dados e suporte técnico especializado.</p>
-            </div>
-            <p>Deseja prosseguir para a configuração da sua liga?</p>
-            <div className="flex gap-3 pt-2">
+
+        <div className="flex p-1 bg-gray-900 rounded-xl mb-6">
+            <button 
+                onClick={() => setActiveTab('login')}
+                className={`flex-1 py-2 px-4 rounded-lg font-bold text-sm transition-all ${activeTab === 'login' ? 'bg-gray-800 text-green-400 shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+            >
+                ENTRAR
+            </button>
+            <button 
+                onClick={() => setActiveTab('create')}
+                className={`flex-1 py-2 px-4 rounded-lg font-bold text-sm transition-all ${activeTab === 'create' ? 'bg-gray-800 text-green-400 shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}
+            >
+                CRIAR LIGA
+            </button>
+        </div>
+
+        {activeTab === 'login' ? (
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                    <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1 ml-1">E-mail Administrativo</label>
+                    <input 
+                        type="email" 
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-green-500 transition-colors"
+                        placeholder="admin@liga.com"
+                        required
+                    />
+                </div>
+                <div>
+                    <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1 ml-1">Senha de Acesso</label>
+                    <input 
+                        type="password" 
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-green-500 transition-colors"
+                        placeholder="••••••••"
+                        required
+                    />
+                </div>
                 <button 
-                  onClick={onClose} 
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                    type="submit"
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-green-900/20 active:scale-95"
                 >
-                  Voltar
+                    ENTRAR NO PAINEL
                 </button>
+                <p className="text-[10px] text-gray-500 text-center font-bold">Acesso restrito para administradores de ligas.</p>
+            </form>
+        ) : (
+            <div className="space-y-4 text-gray-300">
+                <div className="bg-gray-900 rounded-xl p-5 border border-gray-700/50">
+                    <p className="text-sm leading-relaxed mb-4">Inicie sua jornada no futebol digital. Crie sua liga, organize campeonatos e conecte clubes e jogadores em uma experiência profissional.</p>
+                    <div className="flex items-center gap-3 bg-yellow-400/5 border border-yellow-400/10 p-3 rounded-lg">
+                        <span className="text-lg">⚡</span>
+                        <p className="text-[10px] text-yellow-400 font-bold uppercase leading-tight">Configuração instantânea e ferramentas completas inclusas.</p>
+                    </div>
+                </div>
                 <button 
                   onClick={onNavigateToCreateLeague} 
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-lg shadow-green-900/20"
+                  className="w-full bg-white text-black hover:bg-gray-200 font-black py-4 rounded-xl transition-all shadow-xl active:scale-95"
                 >
-                  Sim, Prosseguir
+                  SIM, CRIAR MINHA LIGA
+                </button>
+                <button 
+                  onClick={() => setActiveTab('login')} 
+                  className="w-full text-gray-500 hover:text-gray-300 font-bold text-sm transition-colors py-2"
+                >
+                  Já tenho uma liga, quero entrar
                 </button>
             </div>
-        </div>
+        )}
       </div>
     </div>
   );

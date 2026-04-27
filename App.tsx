@@ -227,17 +227,21 @@ const App: React.FC = () => {
 
   const handleLogin = async (email: string, pass: string) => {
     try {
+      console.log('Tentando login administrador para:', email);
       const loggedInLeague = await leagueService.login(email, pass);
       if (loggedInLeague) {
+        console.log('Login admin bem-sucedido:', loggedInLeague.name);
         setIsAdminMode(true);
         setAdminLeague(loggedInLeague);
         setView({ name: 'admin_league', leagueId: loggedInLeague.id });
         setIsAdminModalOpen(false);
       } else {
+        console.error('Credenciais inválidas para:', email);
         alert('Credenciais inválidas.');
       }
     } catch (error: any) {
-       alert(`Erro no login: ${error.message}`);
+      console.error('Erro fatal no login:', error);
+      alert(`Erro no login: ${error.message}`);
     }
   };
 
@@ -257,6 +261,7 @@ const App: React.FC = () => {
   };
 
   const handleAdminClick = () => {
+    setIsSidebarOpen(false); // Fechar o menu lateral se estiver aberto
     if (isAdminMode) {
       setIsAdminActionsModalOpen(true);
       return;
