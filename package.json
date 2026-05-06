@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.28.0",
-    "@supabase/supabase-js": "^2.105.0",
+    "@supabase/supabase-js": "^2.105.3",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS leagues (
     logo_url TEXT,
     cover_url TEXT,
     admin_email TEXT UNIQUE NOT NULL,
+    admin_password_hash TEXT,
     city TEXT,
     state TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
