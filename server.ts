@@ -213,13 +213,20 @@ async function startServer() {
 
   // Logging middleware
   app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    console.log(`${new Date().toISOString()} - [${req.method}] ${req.url}`);
+    if (req.method === 'POST') {
+      console.log('Body:', JSON.stringify(req.body).substring(0, 100));
+    }
     next();
   });
 
   const apiRouter = express.Router();
 
-  // API Routes
+  // API Routes - Legacy support and new routes
+  apiRouter.all('/user_register.php', (req, res) => res.redirect(307, '/api/auth/register'));
+  apiRouter.all('/user_login.php', (req, res) => res.redirect(307, '/api/auth/login'));
+  apiRouter.all('/auth.php', (req, res) => res.redirect(307, '/api/auth/admin-login'));
+
   apiRouter.get('/leagues', (req, res) => {
     try {
       const leagues = db.prepare('SELECT * FROM leagues').all() as any[];
@@ -708,8 +715,13 @@ async function startServer() {
   });
 
   apiRouter.all('*', (req, res) => {
-    console.log(`Unmatched API route hit: ${req.method} ${req.url}`);
-    res.status(404).json({ error: `API route not found: ${req.method} ${req.url}` });
+    console.log(`[API 404] ${req.method} ${req.url}`);
+    res.status(404).json({ 
+      error: `Route not found on server`,
+      method: req.method,
+      path: req.url,
+      fullPath: `/api${req.url}`
+    });
   });
 
   app.use('/api', apiRouter);
