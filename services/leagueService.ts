@@ -1,23 +1,42 @@
 
 import { League, Championship, Club, Match, Player, TechnicalStaff, Official, MatchEvent, ChampionshipFinancials, UserProfile, Post, ChampionshipWizardConfig } from '../types';
+import { supabase } from '../src/lib/supabase';
 
 const API_BASE_URL = '/api';
 
-// Helper for image uploads
+// Helper for image uploads using Supabase Storage
 export const uploadImage = async (file: File): Promise<string> => {
     if (!file) return '';
     try {
-        const formData = new FormData();
-        formData.append('file', file);
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `uploads/${fileName}`;
 
-        const response = await fetch(`${API_BASE_URL}/upload`, {
-            method: 'POST',
-            body: formData
-        });
+        // Try to upload to Supabase if client is initialized
+        const { data, error } = await supabase.storage
+            .from('ligafull')
+            .upload(filePath, file);
 
-        if (!response.ok) throw new Error('Erro ao fazer upload');
-        const data = await response.json();
-        return data.url;
+        if (error) {
+            console.warn('Supabase storage error, falling back to dummy:', error);
+            // Fallback to local API if storage bucket doesn't exist or other error
+            const formData = new FormData();
+            formData.append('file', file);
+            const response = await fetch(`${API_BASE_URL}/upload`, {
+                method: 'POST',
+                body: formData
+            });
+            if (!response.ok) return 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800';
+            const resData = await response.json();
+            return resData.url;
+        }
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+            .from('ligafull')
+            .getPublicUrl(filePath);
+
+        return publicUrl;
     } catch (err) {
         console.error('Erro ao fazer upload da imagem:', err);
         return 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800'; // Fallback

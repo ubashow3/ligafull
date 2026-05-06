@@ -211,6 +211,29 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
+  // Legacy PHP Redirects (Moved to root app for better compatibility)
+  app.all('/user_register.php', (req, res) => res.redirect(307, '/api/auth/register'));
+  app.all('/user_login.php', (req, res) => res.redirect(307, '/api/auth/login'));
+  app.all('/auth.php', (req, res) => res.redirect(307, '/api/auth/admin-login'));
+
+  // Health check/Debug routes
+  app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+  app.get('/api/debug/routes', (req, res) => {
+    const routes: string[] = [];
+    app._router.stack.forEach((middleware: any) => {
+      if (middleware.route) {
+        routes.push(`${Object.keys(middleware.route.methods).join(',').toUpperCase()} ${middleware.route.path}`);
+      } else if (middleware.name === 'router') {
+        middleware.handle.stack.forEach((handler: any) => {
+          if (handler.route) {
+            routes.push(`${Object.keys(handler.route.methods).join(',').toUpperCase()} /api${handler.route.path}`);
+          }
+        });
+      }
+    });
+    res.json({ routes });
+  });
+
   // Logging middleware
   app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - [${req.method}] ${req.url}`);
@@ -221,11 +244,6 @@ async function startServer() {
   });
 
   const apiRouter = express.Router();
-
-  // API Routes - Legacy support and new routes
-  apiRouter.all('/user_register.php', (req, res) => res.redirect(307, '/api/auth/register'));
-  apiRouter.all('/user_login.php', (req, res) => res.redirect(307, '/api/auth/login'));
-  apiRouter.all('/auth.php', (req, res) => res.redirect(307, '/api/auth/admin-login'));
 
   apiRouter.get('/leagues', (req, res) => {
     try {

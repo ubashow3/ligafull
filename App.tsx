@@ -21,23 +21,17 @@ import AuthWall from './components/auth/AuthWall';
 
 const normalizeUrl = (url: string | null | undefined): string => {
     if (!url) return '';
-    if (url.startsWith('http')) {
-        // Se a URL contém /uploads/ mas não contém /LigaFull/uploads/, e o host é localhost, tenta corrigir
-        if (url.includes('/uploads/') && !url.includes('/LigaFull/uploads/')) {
-            return url.replace('/uploads/', '/LigaFull/uploads/');
-        }
-        return url;
-    }
+    if (url.startsWith('http')) return url;
     
     let cleanPath = url;
     if (cleanPath.startsWith('/')) cleanPath = cleanPath.substring(1);
     
-    // Se já começa com LigaFull, não duplica
-    if (cleanPath.startsWith('LigaFull/')) {
+    // Check if it's already a relative path that looks correct
+    if (cleanPath.startsWith('uploads/')) {
         return `/${cleanPath}`;
     }
     
-    return `/LigaFull/${cleanPath}`;
+    return `/${cleanPath}`;
 };
 
 const calculateStandings = (clubs: Club[], matches: Match[]): Standing[] => {
