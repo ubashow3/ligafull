@@ -751,6 +751,12 @@ async function startServer() {
       appType: 'spa',
     });
     app.use(vite.middlewares);
+    
+    // Explicitly handle all non-api routes for the SPA
+    app.get('*', (req, res, next) => {
+      if (req.url.startsWith('/api')) return next();
+      res.sendFile(path.join(__dirname, 'index.html'));
+    });
   } else {
     app.use(express.static(path.join(__dirname, 'dist')));
     app.get('*', (req, res) => {
