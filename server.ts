@@ -1,224 +1,242 @@
 import express from 'express';
 import cors from 'cors';
 import Database from 'better-sqlite3';
-import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 import fs from 'fs/promises';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const db = new Database('db_futebol.sqlite');
 
-// Initialize database tables if they don't exist
-db.exec(`
-  CREATE TABLE IF NOT EXISTS leagues (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    slug TEXT NOT NULL,
-    admin_email TEXT UNIQUE NOT NULL,
-    admin_password_hash TEXT,
-    logo_url TEXT,
-    cover_url TEXT,
-    city TEXT,
-    state TEXT
-  );
+let db: any;
 
-  CREATE TABLE IF NOT EXISTS championships (
-    id TEXT PRIMARY KEY,
-    league_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    referee_fee REAL DEFAULT 0,
-    assistant_fee REAL DEFAULT 0,
-    table_official_fee REAL DEFAULT 0,
-    field_fee REAL DEFAULT 0,
-    yellow_card_fine REAL DEFAULT 0,
-    red_card_fine REAL DEFAULT 0,
-    registration_fee_per_club REAL DEFAULT 0,
-    player_registration_deadline TEXT,
-    FOREIGN KEY (league_id) REFERENCES leagues (id)
-  );
+async function initDB() {
+  if (db) return db;
+  
+  try {
+    const dbPath = path.resolve(process.cwd(), 'db_futebol.sqlite');
+    console.log(`[DB] Initializing at ${dbPath}`);
+    
+    // On Vercel, the filesystem is read-only. We try to open the DB.
+    // If we are in production/Vercel, we might want to just open it without creating tables
+    // if table creation fails.
+    db = new Database(dbPath, { verbose: console.log });
+    
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS leagues (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          slug TEXT NOT NULL,
+          admin_email TEXT UNIQUE NOT NULL,
+          admin_password_hash TEXT,
+          logo_url TEXT,
+          cover_url TEXT,
+          city TEXT,
+          state TEXT
+        );
 
-  CREATE TABLE IF NOT EXISTS officials (
-    id TEXT PRIMARY KEY,
-    league_id TEXT NOT NULL,
-    type TEXT NOT NULL,
-    name TEXT NOT NULL,
-    nickname TEXT,
-    cpf TEXT,
-    bank_account TEXT,
-    role TEXT,
-    FOREIGN KEY (league_id) REFERENCES leagues (id)
-  );
+        CREATE TABLE IF NOT EXISTS championships (
+          id TEXT PRIMARY KEY,
+          league_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          referee_fee REAL DEFAULT 0,
+          assistant_fee REAL DEFAULT 0,
+          table_official_fee REAL DEFAULT 0,
+          field_fee REAL DEFAULT 0,
+          yellow_card_fine REAL DEFAULT 0,
+          red_card_fine REAL DEFAULT 0,
+          registration_fee_per_club REAL DEFAULT 0,
+          player_registration_deadline TEXT,
+          FOREIGN KEY (league_id) REFERENCES leagues (id)
+        );
 
-  CREATE TABLE IF NOT EXISTS clubs (
-    id TEXT PRIMARY KEY,
-    championship_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    abbreviation TEXT,
-    logo_url TEXT,
-    whatsapp TEXT,
-    is_paid INTEGER DEFAULT 0,
-    FOREIGN KEY (championship_id) REFERENCES championships (id)
-  );
+        CREATE TABLE IF NOT EXISTS officials (
+          id TEXT PRIMARY KEY,
+          league_id TEXT NOT NULL,
+          type TEXT NOT NULL,
+          name TEXT NOT NULL,
+          nickname TEXT,
+          cpf TEXT,
+          bank_account TEXT,
+          role TEXT,
+          FOREIGN KEY (league_id) REFERENCES leagues (id)
+        );
 
-  CREATE TABLE IF NOT EXISTS players (
-    id TEXT PRIMARY KEY,
-    club_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    nickname TEXT,
-    position TEXT,
-    goals INTEGER DEFAULT 0,
-    photo_url TEXT,
-    birth_date TEXT,
-    cpf TEXT,
-    FOREIGN KEY (club_id) REFERENCES clubs (id)
-  );
+        CREATE TABLE IF NOT EXISTS clubs (
+          id TEXT PRIMARY KEY,
+          championship_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          abbreviation TEXT,
+          logo_url TEXT,
+          whatsapp TEXT,
+          is_paid INTEGER DEFAULT 0,
+          FOREIGN KEY (championship_id) REFERENCES championships (id)
+        );
 
-  CREATE TABLE IF NOT EXISTS technical_staff (
-    id TEXT PRIMARY KEY,
-    club_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    role TEXT,
-    FOREIGN KEY (club_id) REFERENCES clubs (id)
-  );
+        CREATE TABLE IF NOT EXISTS players (
+          id TEXT PRIMARY KEY,
+          club_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          nickname TEXT,
+          position TEXT,
+          goals INTEGER DEFAULT 0,
+          photo_url TEXT,
+          birth_date TEXT,
+          cpf TEXT,
+          FOREIGN KEY (club_id) REFERENCES clubs (id)
+        );
 
-  CREATE TABLE IF NOT EXISTS matches (
-    id TEXT PRIMARY KEY,
-    championship_id TEXT NOT NULL,
-    round INTEGER,
-    home_team_id TEXT NOT NULL,
-    away_team_id TEXT NOT NULL,
-    home_score INTEGER DEFAULT 0,
-    away_score INTEGER DEFAULT 0,
-    match_date TEXT,
-    location TEXT,
-    status TEXT DEFAULT 'scheduled',
-    referee_id TEXT,
-    assistant1_id TEXT,
-    assistant2_id TEXT,
-    table_official_id TEXT,
-    events TEXT, -- JSON
-    home_lineup TEXT, -- JSON
-    away_lineup TEXT, -- JSON
-    FOREIGN KEY (championship_id) REFERENCES championships (id)
-  );
+        CREATE TABLE IF NOT EXISTS technical_staff (
+          id TEXT PRIMARY KEY,
+          club_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          role TEXT,
+          FOREIGN KEY (club_id) REFERENCES clubs (id)
+        );
 
-  CREATE TABLE IF NOT EXISTS posts (
-    id TEXT PRIMARY KEY,
-    league_id TEXT NOT NULL,
-    title TEXT NOT NULL,
-    content TEXT,
-    image_url TEXT,
-    author_name TEXT,
-    author_photo TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (league_id) REFERENCES leagues (id)
-  );
+        CREATE TABLE IF NOT EXISTS matches (
+          id TEXT PRIMARY KEY,
+          championship_id TEXT NOT NULL,
+          round INTEGER,
+          home_team_id TEXT NOT NULL,
+          away_team_id TEXT NOT NULL,
+          home_score INTEGER DEFAULT 0,
+          away_score INTEGER DEFAULT 0,
+          match_date TEXT,
+          location TEXT,
+          status TEXT DEFAULT 'scheduled',
+          referee_id TEXT,
+          assistant1_id TEXT,
+          assistant2_id TEXT,
+          table_official_id TEXT,
+          events TEXT, -- JSON
+          home_lineup TEXT, -- JSON
+          away_lineup TEXT, -- JSON
+          FOREIGN KEY (championship_id) REFERENCES championships (id)
+        );
 
-  CREATE TABLE IF NOT EXISTS club_fines (
-    id TEXT PRIMARY KEY,
-    championship_id TEXT NOT NULL,
-    club_id TEXT NOT NULL,
-    round INTEGER NOT NULL,
-    amount REAL DEFAULT 0,
-    is_paid INTEGER DEFAULT 0,
-    FOREIGN KEY (championship_id) REFERENCES championships (id),
-    FOREIGN KEY (club_id) REFERENCES clubs (id)
-  );
+        CREATE TABLE IF NOT EXISTS posts (
+          id TEXT PRIMARY KEY,
+          league_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          content TEXT,
+          image_url TEXT,
+          author_name TEXT,
+          author_photo TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (league_id) REFERENCES leagues (id)
+        );
 
-  CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    full_name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    photo_url TEXT,
-    is_paid INTEGER DEFAULT 1,
-    trial_started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    registered_league_id TEXT
-  );
+        CREATE TABLE IF NOT EXISTS club_fines (
+          id TEXT PRIMARY KEY,
+          championship_id TEXT NOT NULL,
+          club_id TEXT NOT NULL,
+          round INTEGER NOT NULL,
+          amount REAL DEFAULT 0,
+          is_paid INTEGER DEFAULT 0,
+          FOREIGN KEY (championship_id) REFERENCES championships (id),
+          FOREIGN KEY (club_id) REFERENCES clubs (id)
+        );
 
-  CREATE TABLE IF NOT EXISTS ads (
-    id TEXT PRIMARY KEY,
-    brand_name TEXT NOT NULL,
-    image_url TEXT,
-    target_url TEXT,
-    active INTEGER DEFAULT 1
-  );
-`);
+        CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY,
+          full_name TEXT NOT NULL,
+          email TEXT UNIQUE NOT NULL,
+          password_hash TEXT NOT NULL,
+          photo_url TEXT,
+          is_paid INTEGER DEFAULT 1,
+          trial_started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          registered_league_id TEXT
+        );
 
-// Seed data function
-const seedData = () => {
-  const leagueCount = db.prepare('SELECT COUNT(*) as count FROM leagues').get() as any;
-  if (leagueCount.count === 0) {
-    console.log('Seeding initial data...');
-    const leagueId = 'admin-1';
-    const email = 'ubashow3@gmail.com';
-    const password = 'admin'; // Alterado para 'admin' por facilidade
-    const hash = bcrypt.hashSync(password, 10);
+        CREATE TABLE IF NOT EXISTS ads (
+          id TEXT PRIMARY KEY,
+          brand_name TEXT NOT NULL,
+          image_url TEXT,
+          target_url TEXT,
+          active INTEGER DEFAULT 1
+        );
+      `);
 
-    db.prepare('INSERT INTO leagues (id, name, slug, admin_email, admin_password_hash, city, state) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
-      leagueId, 'Minha Liga', 'minha-liga', email, hash, 'Sua Cidade', 'UF'
-    );
+      // Seeding logic
+      const leagueCount = db.prepare('SELECT COUNT(*) as count FROM leagues').get() as any;
+      if (leagueCount && leagueCount.count === 0) {
+        console.log('[DB] Seeding initial data...');
+        const leagueId = 'admin-1';
+        const email = 'ubashow3@gmail.com';
+        const password = 'admin';
+        const hash = bcrypt.hashSync(password, 10);
 
-    const champId = 'c1';
-    db.prepare('INSERT INTO championships (id, league_id, name, referee_fee) VALUES (?, ?, ?, ?)').run(
-      champId, leagueId, 'Campeonato Principal', 100
-    );
+        db.prepare('INSERT INTO leagues (id, name, slug, admin_email, admin_password_hash, city, state) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+          leagueId, 'Minha Liga', 'minha-liga', email, hash, 'Sua Cidade', 'UF'
+        );
 
-    const club1Id = 'club1';
-    db.prepare('INSERT INTO clubs (id, championship_id, name, abbreviation) VALUES (?, ?, ?, ?)').run(
-      club1Id, champId, 'Palmeiras', 'PAL'
-    );
+        const champId = 'c1';
+        db.prepare('INSERT INTO championships (id, league_id, name, referee_fee) VALUES (?, ?, ?, ?)').run(
+          champId, leagueId, 'Campeonato Principal', 100
+        );
 
-    const club2Id = 'club2';
-    db.prepare('INSERT INTO clubs (id, championship_id, name, abbreviation) VALUES (?, ?, ?, ?)').run(
-      club2Id, champId, 'Corinthians', 'COR'
-    );
+        const club1Id = 'club1';
+        db.prepare('INSERT INTO clubs (id, championship_id, name, abbreviation) VALUES (?, ?, ?, ?)').run(
+          club1Id, champId, 'Palmeiras', 'PAL'
+        );
 
-    db.prepare('INSERT INTO officials (id, league_id, type, name, nickname) VALUES (?, ?, ?, ?, ?)').run(
-      'ref1', leagueId, 'referee', 'Anderson Daronco', 'Daronco'
-    );
+        const club2Id = 'club2';
+        db.prepare('INSERT INTO clubs (id, championship_id, name, abbreviation) VALUES (?, ?, ?, ?)').run(
+          club2Id, champId, 'Corinthians', 'COR'
+        );
 
-    db.prepare('INSERT INTO officials (id, league_id, type, name, nickname) VALUES (?, ?, ?, ?, ?)').run(
-      'table1', leagueId, 'table_official', 'Maria Silva', 'Maria'
-    );
-    console.log('Seed completed. Email: ubashow3@gmail.com / Password: admin');
+        db.prepare('INSERT INTO officials (id, league_id, type, name, nickname) VALUES (?, ?, ?, ?, ?)').run(
+          'ref1', leagueId, 'referee', 'Anderson Daronco', 'Daronco'
+        );
 
-    db.prepare('INSERT INTO ads (id, brand_name, image_url, target_url, active) VALUES (?, ?, ?, ?, ?)').run(
-      'ad1', 'Nike', 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400', 'https://nike.com', 1
-    );
+        db.prepare('INSERT INTO officials (id, league_id, type, name, nickname) VALUES (?, ?, ?, ?, ?)').run(
+          'table1', leagueId, 'table_official', 'Maria Silva', 'Maria'
+        );
+
+        db.prepare('INSERT INTO ads (id, brand_name, image_url, target_url, active) VALUES (?, ?, ?, ?, ?)').run(
+          'ad1', 'Nike', 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400', 'https://nike.com', 1
+        );
+      }
+    } catch (tblErr) {
+      console.warn("[DB] Table creation/seeding skipped (filesystem might be read-only on Vercel):", tblErr);
+    }
+  } catch (err) {
+    console.error("[DB] Initialization error:", err);
+    // Fallback to in-memory if disk-based SQLite fails (essential for Vercel functions to boot)
+    db = new Database(':memory:');
   }
-
-  // Ensure test user exists
-  const email = 'ubashow3@gmail.com';
-  const userExists = db.prepare('SELECT COUNT(*) as count FROM users WHERE email = ?').get(email) as any;
-  if (userExists.count === 0) {
-    console.log('Seeding test user...');
-    const userId = 'user-1';
-    const password = 'admin';
-    const hash = bcrypt.hashSync(password, 10);
-    const userPhoto = `https://ui-avatars.com/api/?name=${encodeURIComponent('Usuário Teste')}&background=0D8ABC&color=fff`;
-    db.prepare('INSERT INTO users (id, full_name, email, password_hash, photo_url, is_paid) VALUES (?, ?, ?, ?, ?, ?)').run(
-      userId, 'Usuário Teste', email, hash, userPhoto, 1
-    );
-  }
-};
-
-seedData();
+  return db;
+}
 
 async function startServer() {
   const app = express();
   app.use(cors());
   app.use(express.json());
 
-  // Legacy PHP Redirects (Moved to root app for better compatibility)
+  // Ensure DB and its tables are ready for all API requests
+  app.use('/api', async (req, res, next) => {
+    try {
+      await initDB();
+      next();
+    } catch (err) {
+      res.status(500).json({ error: 'Database failed to initialize' });
+    }
+  });
+
+  // Legacy PHP Redirects
   app.all('/user_register.php', (req, res) => res.redirect(307, '/api/auth/register'));
   app.all('/user_login.php', (req, res) => res.redirect(307, '/api/auth/login'));
   app.all('/auth.php', (req, res) => res.redirect(307, '/api/auth/admin-login'));
 
-  // Health check/Debug routes
-  app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+  // Health check
+  app.get('/api/health', (req, res) => res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    vercel: !!process.env.VERCEL,
+    env: process.env.NODE_ENV
+  }));
   app.get('/api/debug/routes', (req, res) => {
     const routes: string[] = [];
     app._router.stack.forEach((middleware: any) => {
@@ -745,8 +763,9 @@ async function startServer() {
 
   app.use('/api', apiRouter);
 
-  // Vite integration
-  if (process.env.NODE_ENV !== 'production') {
+  // Vite integration (Only for non-production environments)
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
@@ -762,7 +781,7 @@ async function startServer() {
       }
       try {
         const url = req.originalUrl;
-        console.log(`[SPA Fallback] Serving index.html for ${url}`);
+        console.log(`[SPA Fallback] Serving index.html for ${url} using Vite`);
         
         // Read index.html
         let template = await fs.readFile(path.resolve(__dirname, 'index.html'), 'utf-8');
@@ -778,13 +797,26 @@ async function startServer() {
       }
     });
   } else {
-    const distPath = path.join(__dirname, 'dist');
+    // Production behavior (Vercel or manual deployment)
+    const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
+    
     app.get('*', (req, res) => {
+      // Don't intercept API requests that reached this far (they are truly 404)
       if (req.url.startsWith('/api')) {
         return res.status(404).json({ error: 'API route not found' });
       }
-      res.sendFile(path.join(distPath, 'index.html'));
+      
+      // Serve the app's index.html for all other routes to support SPA routing
+      // On Vercel, we might need a different path or just let Vercel handle it via vercel.json
+      res.sendFile(path.join(distPath, 'index.html'), (err) => {
+        if (err) {
+          // If we are on Vercel and it's not found here, it's likely handled by vercel.json
+          // but we provide a fallback message.
+          console.error('[Production] index.html not found at', path.join(distPath, 'index.html'));
+          res.status(404).send('Not Found');
+        }
+      });
     });
   }
 
@@ -800,4 +832,11 @@ async function startServer() {
   return app;
 }
 
-export default startServer();
+export const appPromise = startServer();
+
+const handler = async (req: any, res: any) => {
+  const app = await appPromise;
+  return app(req, res);
+};
+
+export default handler;

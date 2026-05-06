@@ -1,23 +1,21 @@
 {
   "version": 2,
-  "public": true,
-  "cleanUrls": true,
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/server.ts"
+      "destination": "/api/index.ts"
     },
     {
       "source": "/user_register.php",
-      "destination": "/server.ts"
+      "destination": "/api/index.ts"
     },
     {
       "source": "/user_login.php",
-      "destination": "/server.ts"
+      "destination": "/api/index.ts"
     },
     {
       "source": "/auth.php",
-      "destination": "/server.ts"
+      "destination": "/api/index.ts"
     },
     {
       "source": "/(.*)",
