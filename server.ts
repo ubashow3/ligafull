@@ -336,13 +336,13 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/auth.php', (req, res) => {
+  apiRouter.post('/auth/admin-login', (req, res) => {
     const { email, password } = req.body;
-    console.log(`Login attempt for ${email}`);
+    console.log(`Login attempt for admin: ${email}`);
     try {
       const league = db.prepare('SELECT * FROM leagues WHERE admin_email = ?').get(email) as any;
       if (league && bcrypt.compareSync(password || '', league.admin_password_hash)) {
-        console.log(`Login success for ${email}`);
+        console.log(`Login success for admin: ${email}`);
         res.json({
           ...league,
           adminEmail: league.admin_email,
@@ -350,7 +350,7 @@ async function startServer() {
           coverUrl: league.cover_url
         });
       } else {
-        console.log(`Login failed for ${email}`);
+        console.log(`Login failed for admin: ${email}`);
         res.status(401).json({ error: 'Credenciais inválidas' });
       }
     } catch (error: any) {
@@ -361,6 +361,7 @@ async function startServer() {
 
   apiRouter.post('/auth/register', (req, res) => {
     const { full_name, email, password } = req.body;
+    console.log(`Registration attempt for: ${email}`);
     const id = Math.random().toString(36).substr(2, 9);
     const hash = bcrypt.hashSync(password, 10);
     const photo_url = `https://ui-avatars.com/api/?name=${encodeURIComponent(full_name)}&background=0D8ABC&color=fff`;
@@ -384,6 +385,7 @@ async function startServer() {
 
   apiRouter.post('/auth/login', (req, res) => {
     const { email, password } = req.body;
+    console.log(`User login attempt: ${email}`);
     try {
       const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any;
       if (user && bcrypt.compareSync(password, user.password_hash)) {
@@ -398,6 +400,7 @@ async function startServer() {
         res.status(401).json({ error: 'Email ou senha inválidos' });
       }
     } catch (error: any) {
+      console.error('User login error:', error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -593,6 +596,19 @@ async function startServer() {
     }
   });
 
+  apiRouter.post('/clubs/update-registration-status', (req, res) => {
+    const { championship_id, club_id, is_paid } = req.body;
+    try {
+      db.prepare('UPDATE clubs SET is_paid = ? WHERE id = ? AND championship_id = ?').run(
+        is_paid ? 1 : 0, club_id, championship_id
+      );
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Update registration status error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   apiRouter.post('/staff/update', (req, res) => {
     const { id, name, role } = req.body;
     try {
@@ -689,6 +705,11 @@ async function startServer() {
       console.error('Update fine error:', error);
       res.status(500).json({ error: error.message });
     }
+  });
+
+  apiRouter.all('*', (req, res) => {
+    console.log(`Unmatched API route hit: ${req.method} ${req.url}`);
+    res.status(404).json({ error: `API route not found: ${req.method} ${req.url}` });
   });
 
   app.use('/api', apiRouter);

@@ -25,7 +25,9 @@ export const uploadImage = async (file: File): Promise<string> => {
 };
 
 export const userRegister = async (userData: any): Promise<UserProfile> => {
-    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+    const url = `${API_BASE_URL}/auth/register`;
+    console.log(`Fetching: POST ${url}`, userData);
+    const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData)
@@ -247,7 +249,7 @@ export const deletePlayer = async (clubId: string, playerId: string): Promise<vo
 };
 
 export const updateClubRegistrationStatus = async (championshipId: string, clubId: string, isPaid: boolean): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/update_club_registration_status.php`, {
+    const response = await fetch(`${API_BASE_URL}/clubs/update-registration-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -481,7 +483,7 @@ export const generateMatches = async (championshipId: string, config: Championsh
 
 export const login = async (email: string, pass: string): Promise<League | null> => {
     try {
-        const response = await fetch(`${API_BASE_URL}/auth.php`, {
+        const response = await fetch(`${API_BASE_URL}/auth/admin-login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password: pass })
