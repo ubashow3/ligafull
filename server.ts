@@ -5,6 +5,7 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
+import fs from 'fs/promises';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const db = new Database('db_futebol.sqlite');
@@ -750,17 +751,40 @@ async function startServer() {
       server: { middlewareMode: true },
       appType: 'spa',
     });
+    
+    // Mount the Vite middleware
     app.use(vite.middlewares);
     
-    // Explicitly handle all non-api routes for the SPA
-    app.get('*', (req, res, next) => {
-      if (req.url.startsWith('/api')) return next();
-      res.sendFile(path.join(__dirname, 'index.html'));
+    // Fallback all other GET requests to Vite's index.html handling
+    app.get('*', async (req, res, next) => {
+      if (req.url.startsWith('/api')) {
+        return next();
+      }
+      try {
+        const url = req.originalUrl;
+        console.log(`[SPA Fallback] Serving index.html for ${url}`);
+        
+        // Read index.html
+        let template = await fs.readFile(path.resolve(__dirname, 'index.html'), 'utf-8');
+        
+        // Transform index.html with Vite (injects scripts, etc)
+        template = await vite.transformIndexHtml(url, template);
+        
+        // Send the transformed HTML
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e) {
+        console.error('[SPA Fallback Error]', e);
+        next(e);
+      }
     });
   } else {
-    app.use(express.static(path.join(__dirname, 'dist')));
+    const distPath = path.join(__dirname, 'dist');
+    app.use(express.static(distPath));
     app.get('*', (req, res) => {
-      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+      if (req.url.startsWith('/api')) {
+        return res.status(404).json({ error: 'API route not found' });
+      }
+      res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
