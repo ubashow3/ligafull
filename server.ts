@@ -789,9 +789,15 @@ async function startServer() {
   }
 
   const PORT = 3000;
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running at http://localhost:${PORT}`);
-  });
+  
+  // Only listen if we are not in Vercel environment (Vercel handles the server start)
+  if (!process.env.VERCEL) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running at http://localhost:${PORT}`);
+    });
+  }
+
+  return app;
 }
 
-startServer();
+export default startServer();
