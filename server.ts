@@ -8,12 +8,35 @@ import fs from 'fs/promises';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
-const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+let supabaseClient: any = null;
 
-// Use service role for backend operations to bypass RLS if needed, or anon key for standard operations
-const supabase = createClient(supabaseUrl, supabaseServiceRole || supabaseAnonKey);
+function getSupabase() {
+  if (supabaseClient) return supabaseClient;
+  
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+  const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE || '';
+
+  if (!supabaseUrl || (!supabaseAnonKey && !supabaseServiceRole)) {
+    console.error('[Supabase] Missing credentials! URL:', !!supabaseUrl, 'Key:', !!(supabaseAnonKey || supabaseServiceRole));
+    return null;
+  }
+
+  // Use service role for backend operations to bypass RLS if needed, or anon key for standard operations
+  supabaseClient = createClient(supabaseUrl, supabaseServiceRole || supabaseAnonKey);
+  return supabaseClient;
+}
+
+// Proxy to allow using "supabase" globally while supporting lazy initialization
+const supabase = new Proxy({}, {
+  get(target, prop) {
+    const client = getSupabase();
+    if (!client) {
+      return () => { throw new Error('Supabase client not initialized. Check environment variables.'); };
+    }
+    return client[prop];
+  }
+}) as any;
 
 async function startServer() {
   const app = express();
@@ -21,9 +44,14 @@ async function startServer() {
   app.use(express.json());
 
   app.use('/api', async (req, res, next) => {
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return res.status(500).json({ error: 'Supabase credentials missing' });
+    const supabase = getSupabase();
+    if (!supabase) {
+      return res.status(500).json({ 
+        error: 'Supabase credentials missing',
+        message: 'Por favor, configure as variáveis de ambiente VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no Vercel.'
+      });
     }
+    (req as any).supabase = supabase;
     next();
   });
 
